@@ -35,6 +35,8 @@ struct InspectionRecord: Equatable, Identifiable, Sendable {
     let equipmentNumberSnapshot: String
     let createdAt: Date
     let updatedAt: Date
+    let latitude: Double?
+    let longitude: Double?
     var syncStatus: SyncStatus
     var photoData: Data?
     var status: InspectionStatus?
@@ -50,7 +52,9 @@ struct InspectionRecord: Equatable, Identifiable, Sendable {
         photoData: Data?,
         status: InspectionStatus?,
         memo: String,
-        syncStatus: SyncStatus = .pending
+        syncStatus: SyncStatus = .pending,
+        latitude: Double? = nil,
+        longitude: Double? = nil
     ) {
         self.id = id
         self.targetID = targetID
@@ -58,6 +62,8 @@ struct InspectionRecord: Equatable, Identifiable, Sendable {
         self.equipmentNumberSnapshot = equipmentNumberSnapshot
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.latitude = latitude
+        self.longitude = longitude
         self.syncStatus = syncStatus
         self.photoData = photoData
         self.status = status

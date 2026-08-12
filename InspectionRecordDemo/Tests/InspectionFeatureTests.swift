@@ -3,6 +3,10 @@ import Foundation
 import XCTest
 @testable import InspectionRecordDemo
 
+private final class TestLocationPreference: @unchecked Sendable {
+    var isSuppressed = false
+}
+
 @MainActor
 final class InspectionFeatureTests: XCTestCase {
     func testTaskLoadsPersistedSnapshot() async {
@@ -95,6 +99,7 @@ final class InspectionFeatureTests: XCTestCase {
         await store.receive(\.recordPersisted) {
             $0.records = [record]
             $0.destination = nil
+            $0.isLocationPermissionWarningPresented = true
         }
     }
 
@@ -128,7 +133,82 @@ final class InspectionFeatureTests: XCTestCase {
         await store.receive(\.recordPersisted) {
             $0.records = [updatedRecord]
             $0.destination = nil
+            $0.isLocationPermissionWarningPresented = true
         }
+    }
+
+    func testSavingRecordWithoutLocationShowsWarningWhenNotSuppressed() async {
+        let target = makeTarget()
+        let record = makeRecord(for: target)
+        var initialState = InspectionListFeature.State()
+        initialState.targets = [target]
+        initialState.destination = .inspection(InspectionEditorFeature.State(target: target))
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        } withDependencies: {
+            $0.inspectionRepository = makeRepository()
+            $0.locationPreferences = LocationPreferencesClient(
+                suppressLocationPermissionWarning: { false },
+                setSuppressLocationPermissionWarning: { _ in }
+            )
+        }
+
+        await store.send(
+            .destination(.presented(.inspection(.delegate(.saved(record)))))
+        )
+        await store.receive(\.recordPersisted) {
+            $0.records = [record]
+            $0.destination = nil
+            $0.isLocationPermissionWarningPresented = true
+        }
+    }
+
+    func testSavingRecordWithoutLocationHidesWarningWhenSuppressed() async {
+        let target = makeTarget()
+        let record = makeRecord(for: target)
+        var initialState = InspectionListFeature.State()
+        initialState.targets = [target]
+        initialState.destination = .inspection(InspectionEditorFeature.State(target: target))
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        } withDependencies: {
+            $0.inspectionRepository = makeRepository()
+            $0.locationPreferences = LocationPreferencesClient(
+                suppressLocationPermissionWarning: { true },
+                setSuppressLocationPermissionWarning: { _ in }
+            )
+        }
+
+        await store.send(
+            .destination(.presented(.inspection(.delegate(.saved(record)))))
+        )
+        await store.receive(\.recordPersisted) {
+            $0.records = [record]
+            $0.destination = nil
+            $0.isLocationPermissionWarningPresented = false
+        }
+    }
+
+    func testSuppressLocationWarningPersistsPreference() async {
+        let preference = TestLocationPreference()
+        var initialState = InspectionListFeature.State()
+        initialState.isLocationPermissionWarningPresented = true
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        } withDependencies: {
+            $0.locationPreferences = LocationPreferencesClient(
+                suppressLocationPermissionWarning: { preference.isSuppressed },
+                setSuppressLocationPermissionWarning: { value in
+                    preference.isSuppressed = value
+                }
+            )
+        }
+
+        await store.send(.locationPermissionWarningSuppressionRequested) {
+            $0.isLocationPermissionWarningPresented = false
+        }
+
+        XCTAssertTrue(preference.isSuppressed)
     }
 
     func testSavingInspectionRecordKeepsEditorOpenWhenPersistenceFails() async {
@@ -187,7 +267,13 @@ final class InspectionFeatureTests: XCTestCase {
         }
 
         await store.send(.cancelButtonTapped)
-        await store.receive(\.delegate, .cancelled)
+        await store.receive { action in
+            guard case .delegate(.cancelled) = action else {
+                return false
+            }
+
+            return true
+        }
     }
 
     func testInspectionViewCloseSendsCancelledDelegate() async {
@@ -199,7 +285,13 @@ final class InspectionFeatureTests: XCTestCase {
         }
 
         await store.send(.closeButtonTapped)
-        await store.receive(\.delegate, .cancelled)
+        await store.receive { action in
+            guard case .delegate(.cancelled) = action else {
+                return false
+            }
+
+            return true
+        }
     }
 
     func testCreatingInspectionRecordUsesCreatedAtAsUpdatedAtAndPendingStatus() async {
@@ -211,7 +303,19 @@ final class InspectionFeatureTests: XCTestCase {
         }
         let createdAt = store.state.createdAt
 
-        await store.send(.saveButtonTapped)
+        await store.send(.saveButtonTapped) {
+            $0.isSaving = true
+        }
+        await store.receive { action in
+            guard case .locationSaveCompleted(nil) = action else {
+                return false
+            }
+
+            return true
+        } assert: {
+            $0.isSaving = false
+            $0.isLocationLoading = false
+        }
         await store.receive { action in
             guard case let .delegate(.saved(record)) = action else {
                 return false
@@ -265,6 +369,335 @@ final class InspectionFeatureTests: XCTestCase {
             XCTAssertEqual(record.createdAt, originalCreatedAt)
             XCTAssertGreaterThan(record.updatedAt, originalUpdatedAt)
             XCTAssertEqual(record.syncStatus, .pending)
+            return true
+        }
+    }
+
+    func testLocationPreparationAcquiresLocationAndSavingIncludesSnapshot() async {
+        let target = makeTarget()
+        let sample = makeLocationSample()
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(target: target)
+        ) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.locationClient = LocationClient(
+                authorizationStatus: { .authorized },
+                requestWhenInUseAuthorization: { .authorized },
+                requestCurrentLocation: { sample }
+            )
+        }
+
+        await store.send(.locationPreparationRequested)
+        await store.receive { action in
+            guard case .locationAuthorizationChecked(.authorized, .preparation) = action else {
+                return false
+            }
+
+            return true
+        } assert: {
+            $0.isLocationLoading = true
+        }
+        await store.receive { action in
+            guard case .locationUpdated = action else {
+                return false
+            }
+
+            return true
+        } assert: {
+            $0.latitude = sample.latitude
+            $0.longitude = sample.longitude
+            $0.locationCapturedAt = sample.capturedAt
+            $0.isLocationLoading = false
+        }
+
+        await store.send(.saveButtonTapped)
+        await store.receive { action in
+            guard case let .delegate(.saved(record)) = action else {
+                return false
+            }
+
+            XCTAssertEqual(record.latitude, sample.latitude)
+            XCTAssertEqual(record.longitude, sample.longitude)
+            XCTAssertEqual(record.createdAt, record.updatedAt)
+            return true
+        }
+    }
+
+    func testLocationIntroductionPrecedesPermissionRequestAndLocationAcquisition() async {
+        let sample = makeLocationSample()
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(target: makeTarget())
+        ) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.locationClient = LocationClient(
+                authorizationStatus: { .notDetermined },
+                requestWhenInUseAuthorization: { .authorized },
+                requestCurrentLocation: { sample }
+            )
+        }
+
+        await store.send(.locationPreparationRequested)
+        await store.receive { action in
+            guard case .locationAuthorizationChecked(.notDetermined, .preparation) = action else {
+                return false
+            }
+
+            return true
+        } assert: {
+            $0.isLocationIntroductionPresented = true
+        }
+        await store.send(.locationIntroductionConfirmed) {
+            $0.isLocationIntroductionPresented = false
+            $0.isLocationLoading = true
+        }
+        await store.receive { action in
+            guard case .locationAuthorizationChecked(.authorized, .preparation) = action else {
+                return false
+            }
+
+            return true
+        }
+        await store.receive { action in
+            guard case .locationUpdated = action else {
+                return false
+            }
+
+            return true
+        } assert: {
+            $0.latitude = sample.latitude
+            $0.longitude = sample.longitude
+            $0.locationCapturedAt = sample.capturedAt
+            $0.isLocationLoading = false
+        }
+    }
+
+    func testLocationPermissionDenialDuringPreparationSkipsWarning() async {
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(target: makeTarget())
+        ) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.locationClient = LocationClient(
+                authorizationStatus: { .notDetermined },
+                requestWhenInUseAuthorization: { .denied },
+                requestCurrentLocation: { nil }
+            )
+        }
+
+        await store.send(.locationPreparationRequested)
+        await store.receive { action in
+            guard case .locationAuthorizationChecked(.notDetermined, .preparation) = action else {
+                return false
+            }
+
+            return true
+        } assert: {
+            $0.isLocationIntroductionPresented = true
+        }
+
+        await store.send(.locationIntroductionConfirmed) {
+            $0.isLocationIntroductionPresented = false
+            $0.isLocationLoading = true
+        }
+        await store.receive { action in
+            guard case .locationAuthorizationChecked(.denied, .preparation) = action else {
+                return false
+            }
+
+            return true
+        } assert: {
+            $0.isLocationLoading = false
+            $0.isLocationPermissionDeniedPresented = false
+        }
+    }
+
+    func testLocationRefreshWithDeniedPermissionPresentsWarning() async {
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(target: makeTarget())
+        ) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.locationClient = LocationClient(
+                authorizationStatus: { .denied },
+                requestWhenInUseAuthorization: { .denied },
+                requestCurrentLocation: { nil }
+            )
+        }
+
+        await store.send(.locationRefreshButtonTapped)
+        await store.receive { action in
+            guard case .locationAuthorizationChecked(.denied, .refresh) = action else {
+                return false
+            }
+
+            return true
+        } assert: {
+            $0.isLocationPermissionDeniedPresented = true
+        }
+
+        await store.send(.locationPermissionDeniedDismissed) {
+            $0.isLocationPermissionDeniedPresented = false
+        }
+    }
+
+    func testLocationPermissionDeniedStillSavesRecordWithoutLocation() async {
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(target: makeTarget())
+        ) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.locationClient = LocationClient(
+                authorizationStatus: { .denied },
+                requestWhenInUseAuthorization: { .denied },
+                requestCurrentLocation: { nil }
+            )
+        }
+
+        await store.send(.saveButtonTapped) {
+            $0.isSaving = true
+        }
+        await store.receive { action in
+            guard case .locationSaveCompleted(nil) = action else {
+                return false
+            }
+
+            return true
+        } assert: {
+            $0.isSaving = false
+            $0.isLocationLoading = false
+        }
+        await store.receive { action in
+            guard case let .delegate(.saved(record)) = action else {
+                return false
+            }
+
+            XCTAssertNil(record.latitude)
+            XCTAssertNil(record.longitude)
+            return true
+        }
+    }
+
+    func testSavingWithStaleLocationRefreshesSnapshot() async {
+        let sample = makeLocationSample(latitude: 35.1796, longitude: 129.0756)
+        var initialState = InspectionEditorFeature.State(target: makeTarget())
+        initialState.latitude = 37.5665
+        initialState.longitude = 126.9780
+        initialState.locationCapturedAt = Date(timeIntervalSinceNow: -600)
+
+        let store = TestStore(initialState: initialState) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.locationClient = LocationClient(
+                authorizationStatus: { .authorized },
+                requestWhenInUseAuthorization: { .authorized },
+                requestCurrentLocation: { sample }
+            )
+        }
+
+        await store.send(.saveButtonTapped) {
+            $0.isSaving = true
+        }
+        await store.receive { action in
+            guard case .locationSaveCompleted = action else {
+                return false
+            }
+
+            return true
+        } assert: {
+            $0.isSaving = false
+            $0.isLocationLoading = false
+            $0.latitude = sample.latitude
+            $0.longitude = sample.longitude
+            $0.locationCapturedAt = sample.capturedAt
+        }
+        await store.receive { action in
+            guard case let .delegate(.saved(record)) = action else {
+                return false
+            }
+
+            XCTAssertEqual(record.latitude, sample.latitude)
+            XCTAssertEqual(record.longitude, sample.longitude)
+            return true
+        }
+    }
+
+    func testLocationRefreshUsesNewLocation() async {
+        let sample = makeLocationSample(latitude: 35.1796, longitude: 129.0756)
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(target: makeTarget())
+        ) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.locationClient = LocationClient(
+                authorizationStatus: { .authorized },
+                requestWhenInUseAuthorization: { .authorized },
+                requestCurrentLocation: { sample }
+            )
+        }
+
+        await store.send(.locationRefreshButtonTapped)
+        await store.receive { action in
+            guard case .locationAuthorizationChecked(.authorized, .refresh) = action else {
+                return false
+            }
+
+            return true
+        } assert: {
+            $0.isLocationLoading = true
+        }
+        await store.receive { action in
+            guard case .locationUpdated = action else {
+                return false
+            }
+
+            return true
+        } assert: {
+            $0.latitude = sample.latitude
+            $0.longitude = sample.longitude
+            $0.locationCapturedAt = sample.capturedAt
+            $0.isLocationLoading = false
+        }
+    }
+
+    func testEditingRecordPreservesExistingLocationSnapshot() async {
+        let target = makeTarget()
+        let record = makeRecord(
+            for: target,
+            latitude: 37.5665,
+            longitude: 126.9780
+        )
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(record: record)
+        ) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.locationClient = LocationClient(
+                authorizationStatus: { .denied },
+                requestWhenInUseAuthorization: { .denied },
+                requestCurrentLocation: { nil }
+            )
+        }
+
+        await store.send(.editButtonTapped) {
+            $0.mode = .editing
+            $0.originalSnapshot = InspectionEditorFeature.State.Snapshot(
+                photoData: record.photoData,
+                status: record.status,
+                memo: record.memo,
+                latitude: record.latitude,
+                longitude: record.longitude
+            )
+        }
+        await store.send(.saveButtonTapped)
+        await store.receive { action in
+            guard case let .delegate(.saved(updatedRecord)) = action else {
+                return false
+            }
+
+            XCTAssertEqual(updatedRecord.latitude, record.latitude)
+            XCTAssertEqual(updatedRecord.longitude, record.longitude)
             return true
         }
     }
@@ -583,7 +1016,9 @@ final class InspectionFeatureTests: XCTestCase {
         createdAt: Date = Date(timeIntervalSince1970: 1_000),
         photoData: Data? = nil,
         status: InspectionStatus? = .normal,
-        memo: String = ""
+        memo: String = "",
+        latitude: Double? = nil,
+        longitude: Double? = nil
     ) -> InspectionRecord {
         InspectionRecord(
             id: UUID(),
@@ -595,7 +1030,21 @@ final class InspectionFeatureTests: XCTestCase {
             photoData: photoData,
             status: status,
             memo: memo,
-            syncStatus: .pending
+            syncStatus: .pending,
+            latitude: latitude,
+            longitude: longitude
+        )
+    }
+
+    private func makeLocationSample(
+        latitude: Double = 37.5665,
+        longitude: Double = 126.9780,
+        capturedAt: Date = Date()
+    ) -> LocationSample {
+        LocationSample(
+            latitude: latitude,
+            longitude: longitude,
+            capturedAt: capturedAt
         )
     }
 }

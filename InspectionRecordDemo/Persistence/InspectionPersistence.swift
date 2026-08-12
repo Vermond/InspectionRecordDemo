@@ -62,6 +62,8 @@ final class InspectionRecordModel {
     var equipmentNumberSnapshot: String
     var createdAt: Date
     var updatedAt: Date
+    var latitude: Double?
+    var longitude: Double?
     var syncStatusRawValue: String
     @Attribute(.externalStorage) var photoData: Data?
     var statusRawValue: String?
@@ -75,6 +77,8 @@ final class InspectionRecordModel {
         equipmentNumberSnapshot: String,
         createdAt: Date,
         updatedAt: Date,
+        latitude: Double?,
+        longitude: Double?,
         syncStatusRawValue: String,
         photoData: Data?,
         statusRawValue: String?,
@@ -87,6 +91,8 @@ final class InspectionRecordModel {
         self.equipmentNumberSnapshot = equipmentNumberSnapshot
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.latitude = latitude
+        self.longitude = longitude
         self.syncStatusRawValue = syncStatusRawValue
         self.photoData = photoData
         self.statusRawValue = statusRawValue
@@ -194,6 +200,8 @@ actor InspectionDatabase {
                         equipmentNumberSnapshot: record.equipmentNumberSnapshot,
                         createdAt: record.createdAt,
                         updatedAt: record.updatedAt,
+                        latitude: record.latitude,
+                        longitude: record.longitude,
                         syncStatusRawValue: record.syncStatus.rawValue,
                         photoData: record.photoData,
                         statusRawValue: record.status?.rawValue,
@@ -259,7 +267,9 @@ private extension InspectionRecordModel {
             photoData: photoData,
             status: statusRawValue.flatMap(InspectionStatus.init(rawValue:)),
             memo: memo,
-            syncStatus: SyncStatus(rawValue: syncStatusRawValue) ?? .pending
+            syncStatus: SyncStatus(rawValue: syncStatusRawValue) ?? .pending,
+            latitude: latitude,
+            longitude: longitude
         )
     }
 
@@ -269,6 +279,8 @@ private extension InspectionRecordModel {
         equipmentNumberSnapshot = record.equipmentNumberSnapshot
         createdAt = record.createdAt
         updatedAt = record.updatedAt
+        latitude = record.latitude
+        longitude = record.longitude
         syncStatusRawValue = record.syncStatus.rawValue
         photoData = record.photoData
         statusRawValue = record.status?.rawValue

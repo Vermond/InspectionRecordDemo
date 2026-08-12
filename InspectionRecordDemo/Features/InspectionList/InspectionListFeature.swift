@@ -1,10 +1,42 @@
 import ComposableArchitecture
 import Foundation
 import SwiftUI
+import UIKit
+
+struct LocationPreferencesClient: Sendable {
+    var suppressLocationPermissionWarning: @Sendable () -> Bool
+    var setSuppressLocationPermissionWarning: @Sendable (Bool) -> Void
+}
+
+extension LocationPreferencesClient: DependencyKey {
+    private static let suppressWarningKey = "suppressLocationPermissionWarning"
+
+    static let liveValue = Self(
+        suppressLocationPermissionWarning: {
+            UserDefaults.standard.bool(forKey: suppressWarningKey)
+        },
+        setSuppressLocationPermissionWarning: { value in
+            UserDefaults.standard.set(value, forKey: suppressWarningKey)
+        }
+    )
+
+    static let testValue = Self(
+        suppressLocationPermissionWarning: { false },
+        setSuppressLocationPermissionWarning: { _ in }
+    )
+}
+
+extension DependencyValues {
+    var locationPreferences: LocationPreferencesClient {
+        get { self[LocationPreferencesClient.self] }
+        set { self[LocationPreferencesClient.self] = newValue }
+    }
+}
 
 @Reducer
 struct InspectionListFeature {
     @Dependency(\.inspectionRepository) private var inspectionRepository
+    @Dependency(\.locationPreferences) private var locationPreferences
 
     @ObservableState
     struct State: Equatable {
@@ -38,6 +70,7 @@ struct InspectionListFeature {
         var isLoading = false
         var hasLoadedPersistence = false
         var persistenceErrorMessage: String?
+        var isLocationPermissionWarningPresented = false
         @Presents var destination: Destination.State?
 
         var filteredRecords: [InspectionRecord] {
@@ -71,6 +104,9 @@ struct InspectionListFeature {
         case recordPersisted(InspectionRecord)
         case persistenceFailed(InspectionPersistenceError)
         case persistenceErrorDismissed
+        case locationPermissionWarningDismissed
+        case locationPermissionWarningSuppressionRequested
+        case locationPermissionWarningSettingsButtonTapped
         case addTargetButtonTapped
         case targetSelected(InspectionTarget.ID)
         case recordSelected(InspectionRecord.ID)
@@ -168,6 +204,9 @@ struct InspectionListFeature {
                 }
 
                 state.destination = nil
+                let hasCompleteLocation = record.latitude != nil && record.longitude != nil
+                state.isLocationPermissionWarningPresented = !hasCompleteLocation
+                    && !self.locationPreferences.suppressLocationPermissionWarning()
                 return .none
 
             case let .persistenceFailed(error):
@@ -176,6 +215,16 @@ struct InspectionListFeature {
 
             case .persistenceErrorDismissed:
                 state.persistenceErrorMessage = nil
+                return .none
+
+            case .locationPermissionWarningDismissed,
+                 .locationPermissionWarningSettingsButtonTapped:
+                state.isLocationPermissionWarningPresented = false
+                return .none
+
+            case .locationPermissionWarningSuppressionRequested:
+                self.locationPreferences.setSuppressLocationPermissionWarning(true)
+                state.isLocationPermissionWarningPresented = false
                 return .none
 
             case .addTargetButtonTapped:
@@ -274,6 +323,7 @@ struct TargetFormFeature {
 
 struct InspectionListView: View {
     @Bindable var store: StoreOf<InspectionListFeature>
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         TabView(selection: $store.selectedTab) {
@@ -313,20 +363,46 @@ struct InspectionListView: View {
             await store.send(.task).finish()
         }
         .alert(
-            "점검 데이터 오류",
+            store.isLocationPermissionWarningPresented ? "위치 정보 없음" : "점검 데이터 오류",
             isPresented: Binding(
-                get: { store.persistenceErrorMessage != nil },
+                get: {
+                    store.persistenceErrorMessage != nil
+                        || store.isLocationPermissionWarningPresented
+                },
                 set: { isPresented in
                     guard !isPresented else { return }
-                    store.send(.persistenceErrorDismissed)
+                    if store.isLocationPermissionWarningPresented {
+                        store.send(.locationPermissionWarningDismissed)
+                    } else {
+                        store.send(.persistenceErrorDismissed)
+                    }
                 }
             )
         ) {
-            Button("확인") {
-                store.send(.persistenceErrorDismissed)
+            if store.isLocationPermissionWarningPresented {
+                Button("닫기", role: .cancel) {
+                    store.send(.locationPermissionWarningDismissed)
+                }
+                Button("다시 알리지 않기") {
+                    store.send(.locationPermissionWarningSuppressionRequested)
+                }
+                Button("설정 열기") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                    store.send(.locationPermissionWarningSettingsButtonTapped)
+                }
+            } else {
+                Button("확인") {
+                    store.send(.persistenceErrorDismissed)
+                }
             }
         } message: {
-            Text(store.persistenceErrorMessage ?? "점검 데이터를 처리하지 못했습니다.")
+            Text(
+                store.isLocationPermissionWarningPresented
+                    ? "이번 점검에는 위치 정보가 기록되지 않았습니다. 위치 권한을 허용하면 다음 점검부터 위치를 기록할 수 있습니다."
+                    : (store.persistenceErrorMessage ?? "점검 데이터를 처리하지 못했습니다.")
+            )
         }
     }
 

@@ -23,7 +23,9 @@ final class InspectionPersistenceTests: XCTestCase {
             photoData: Data([1, 2, 3]),
             status: .caution,
             memo: "필터 확인 필요",
-            syncStatus: .synced
+            syncStatus: .synced,
+            latitude: 37.5665,
+            longitude: 126.9780
         )
 
         try await database.saveTarget(target)
@@ -34,6 +36,8 @@ final class InspectionPersistenceTests: XCTestCase {
 
         XCTAssertEqual(snapshot.targets, [target])
         XCTAssertEqual(snapshot.records, [record])
+        XCTAssertEqual(snapshot.records.first?.latitude, 37.5665)
+        XCTAssertEqual(snapshot.records.first?.longitude, 126.9780)
     }
 
     func testSaveRecordWithSameIDUpdatesExistingRecord() async throws {
