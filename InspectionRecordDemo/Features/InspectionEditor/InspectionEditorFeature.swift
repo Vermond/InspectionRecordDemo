@@ -4,9 +4,14 @@ import Foundation
 @Reducer
 struct InspectionEditorFeature {
     @Dependency(\.cameraClient) private var cameraClient
+    @Dependency(\.geocodingClient) private var geocodingClient
     @Dependency(\.locationClient) private var locationClient
 
     private enum LocationRequestID: Hashable {
+        case current
+    }
+
+    private enum AddressRequestID: Hashable {
         case current
     }
 
@@ -105,6 +110,8 @@ struct InspectionEditorFeature {
         var latitude: Double?
         var longitude: Double?
         var locationCapturedAt: Date?
+        var address: String?
+        var isAddressLoading = false
         var isLocationLoading = false
         var locationPrompt: LocationPrompt?
         var isSaving = false
@@ -124,6 +131,8 @@ struct InspectionEditorFeature {
             self.latitude = nil
             self.longitude = nil
             self.locationCapturedAt = nil
+            self.address = nil
+            self.isAddressLoading = false
             self.originalSnapshot = nil
             self.photoErrorMessage = nil
             self.isCameraPresented = false
@@ -145,6 +154,8 @@ struct InspectionEditorFeature {
             self.latitude = record.latitude
             self.longitude = record.longitude
             self.locationCapturedAt = nil
+            self.address = nil
+            self.isAddressLoading = false
             self.originalSnapshot = nil
             self.photoErrorMessage = nil
             self.isCameraPresented = false
@@ -183,6 +194,8 @@ struct InspectionEditorFeature {
         case cancelButtonTapped
         case locationPreparationRequested
         case locationAuthorizationChecked(LocationAuthorizationStatus, LocationRequestSource)
+        case addressPreparationRequested
+        case addressLoaded(latitude: Double, longitude: Double, address: String?)
         case locationIntroductionConfirmed
         case locationIntroductionDismissed
         case locationRefreshButtonTapped
@@ -226,7 +239,10 @@ struct InspectionEditorFeature {
                 return .none
 
             case .closeButtonTapped:
-                return .send(.delegate(.cancelled))
+                return .merge(
+                    .cancel(id: AddressRequestID.current),
+                    .send(.delegate(.cancelled))
+                )
 
             case .saveButtonTapped:
                 guard state.mode.isEditable, !state.isSaving else {
@@ -290,6 +306,18 @@ struct InspectionEditorFeature {
                     return .none
                 }
 
+            case .addressPreparationRequested:
+                guard let latitude = state.latitude,
+                      let longitude = state.longitude,
+                      state.address == nil,
+                      !state.isAddressLoading
+                else {
+                    return .none
+                }
+
+                state.isAddressLoading = true
+                return requestAddress(latitude: latitude, longitude: longitude)
+
             case .locationIntroductionConfirmed:
                 guard state.mode == .create else {
                     return .none
@@ -328,8 +356,13 @@ struct InspectionEditorFeature {
                 state.latitude = sample.latitude
                 state.longitude = sample.longitude
                 state.locationCapturedAt = sample.capturedAt
+                state.address = nil
+                state.isAddressLoading = true
                 state.isLocationLoading = false
-                return .none
+                return requestAddress(
+                    latitude: sample.latitude,
+                    longitude: sample.longitude
+                )
 
             case .locationUnavailable:
                 state.isLocationLoading = false
@@ -343,10 +376,14 @@ struct InspectionEditorFeature {
                     state.latitude = sample.latitude
                     state.longitude = sample.longitude
                     state.locationCapturedAt = sample.capturedAt
+                    state.address = nil
+                    state.isAddressLoading = false
                 } else {
                     state.latitude = nil
                     state.longitude = nil
                     state.locationCapturedAt = nil
+                    state.address = nil
+                    state.isAddressLoading = false
                 }
 
                 let record = Self.makeRecord(
@@ -356,6 +393,17 @@ struct InspectionEditorFeature {
                     longitude: sample?.longitude
                 )
                 return .send(.delegate(.saved(record)))
+
+            case let .addressLoaded(latitude, longitude, address):
+                guard state.latitude == latitude,
+                      state.longitude == longitude
+                else {
+                    return .none
+                }
+
+                state.address = address
+                state.isAddressLoading = false
+                return .none
 
             case .cameraButtonTapped:
                 guard state.mode.isEditable else {
@@ -427,6 +475,7 @@ struct InspectionEditorFeature {
                     state.isSaving = false
                     return .merge(
                         .cancel(id: LocationRequestID.current),
+                        .cancel(id: AddressRequestID.current),
                         .send(.delegate(.cancelled))
                     )
                 case .view:
@@ -498,6 +547,23 @@ struct InspectionEditorFeature {
             )
         }
         .cancellable(id: LocationRequestID.current, cancelInFlight: true)
+    }
+
+    private func requestAddress(
+        latitude: Double,
+        longitude: Double
+    ) -> EffectOf<Self> {
+        let geocodingClient = self.geocodingClient
+        return .run { send in
+            await send(
+                .addressLoaded(
+                    latitude: latitude,
+                    longitude: longitude,
+                    address: await geocodingClient.reverseGeocode(latitude, longitude)
+                )
+            )
+        }
+        .cancellable(id: AddressRequestID.current, cancelInFlight: true)
     }
 
     private static func makeRecord(

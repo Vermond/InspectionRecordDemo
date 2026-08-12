@@ -23,6 +23,12 @@ struct InspectionEditorView: View {
                               let longitude = store.longitude {
                         LabeledContent("위도", value: String(format: "%.6f", latitude))
                         LabeledContent("경도", value: String(format: "%.6f", longitude))
+                        LabeledContent(
+                            "주소",
+                            value: store.isAddressLoading
+                                ? "주소 확인 중..."
+                                : (store.address ?? "주소 정보 없음")
+                        )
                     } else {
                         Text("위치 정보 없음")
                             .foregroundStyle(.secondary)
@@ -72,6 +78,7 @@ struct InspectionEditorView: View {
             .navigationTitle(store.mode.navigationTitle)
             .task {
                 await store.send(.locationPreparationRequested).finish()
+                await store.send(.addressPreparationRequested).finish()
             }
             .alert(
                 store.locationPrompt == .permissionDenied ? "위치 권한 필요" : "위치 기록 안내",

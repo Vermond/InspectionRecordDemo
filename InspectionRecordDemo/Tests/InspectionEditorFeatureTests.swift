@@ -132,6 +132,9 @@ final class InspectionEditorFeatureTests: XCTestCase {
                 requestWhenInUseAuthorization: { .authorized },
                 requestCurrentLocation: { sample }
             )
+            $0.geocodingClient = GeocodingClient(
+                reverseGeocode: { _, _ in "서울특별시 중구 세종대로 110" }
+            )
         }
 
         await store.send(.locationPreparationRequested)
@@ -154,7 +157,23 @@ final class InspectionEditorFeatureTests: XCTestCase {
             $0.latitude = sample.latitude
             $0.longitude = sample.longitude
             $0.locationCapturedAt = sample.capturedAt
+            $0.address = nil
+            $0.isAddressLoading = true
             $0.isLocationLoading = false
+        }
+
+        await store.receive { action in
+            guard case let .addressLoaded(latitude, longitude, address) = action else {
+                return false
+            }
+
+            XCTAssertEqual(latitude, sample.latitude)
+            XCTAssertEqual(longitude, sample.longitude)
+            XCTAssertEqual(address, "서울특별시 중구 세종대로 110")
+            return true
+        } assert: {
+            $0.address = "서울특별시 중구 세종대로 110"
+            $0.isAddressLoading = false
         }
 
         await store.send(.saveButtonTapped)
@@ -215,7 +234,22 @@ final class InspectionEditorFeatureTests: XCTestCase {
             $0.latitude = sample.latitude
             $0.longitude = sample.longitude
             $0.locationCapturedAt = sample.capturedAt
+            $0.address = nil
+            $0.isAddressLoading = true
             $0.isLocationLoading = false
+        }
+
+        await store.receive { action in
+            guard case let .addressLoaded(latitude, longitude, address) = action else {
+                return false
+            }
+
+            XCTAssertEqual(latitude, sample.latitude)
+            XCTAssertEqual(longitude, sample.longitude)
+            XCTAssertNil(address)
+            return true
+        } assert: {
+            $0.isAddressLoading = false
         }
     }
 
@@ -403,7 +437,58 @@ final class InspectionEditorFeatureTests: XCTestCase {
             $0.latitude = sample.latitude
             $0.longitude = sample.longitude
             $0.locationCapturedAt = sample.capturedAt
+            $0.address = nil
+            $0.isAddressLoading = true
             $0.isLocationLoading = false
+        }
+
+        await store.receive { action in
+            guard case let .addressLoaded(latitude, longitude, address) = action else {
+                return false
+            }
+
+            XCTAssertEqual(latitude, sample.latitude)
+            XCTAssertEqual(longitude, sample.longitude)
+            XCTAssertNil(address)
+            return true
+        } assert: {
+            $0.isAddressLoading = false
+        }
+    }
+
+    func testExistingInspectionRecordLoadsAddressFromStoredCoordinates() async {
+        let target = makeTarget()
+        let record = makeRecord(
+            for: target,
+            latitude: 37.5665,
+            longitude: 126.9780
+        )
+        let expectedAddress = "서울특별시 중구 세종대로 110"
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(record: record)
+        ) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.geocodingClient = GeocodingClient(
+                reverseGeocode: { _, _ in expectedAddress }
+            )
+        }
+
+        await store.send(.addressPreparationRequested) {
+            $0.isAddressLoading = true
+        }
+        await store.receive { action in
+            guard case let .addressLoaded(latitude, longitude, address) = action else {
+                return false
+            }
+
+            XCTAssertEqual(latitude, 37.5665)
+            XCTAssertEqual(longitude, 126.9780)
+            XCTAssertEqual(address, expectedAddress)
+            return true
+        } assert: {
+            $0.address = expectedAddress
+            $0.isAddressLoading = false
         }
     }
 
