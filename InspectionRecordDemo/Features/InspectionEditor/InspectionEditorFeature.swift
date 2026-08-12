@@ -1,11 +1,62 @@
 import ComposableArchitecture
+import AVFoundation
 import Foundation
 import PhotosUI
 import SwiftUI
 import UIKit
 
+enum CameraAuthorizationStatus: Equatable, Sendable {
+    case authorized
+    case notDetermined
+    case denied
+}
+
+struct CameraClient: Sendable {
+    var authorizationStatus: @MainActor @Sendable () -> CameraAuthorizationStatus
+    var requestAccess: @MainActor @Sendable () async -> Bool
+    var isAvailable: @MainActor @Sendable () -> Bool
+}
+
+extension CameraClient: DependencyKey {
+    static let liveValue = Self(
+        authorizationStatus: {
+            switch AVCaptureDevice.authorizationStatus(for: .video) {
+            case .authorized:
+                .authorized
+            case .notDetermined:
+                .notDetermined
+            case .denied, .restricted:
+                .denied
+            @unknown default:
+                .denied
+            }
+        },
+        requestAccess: {
+            await AVCaptureDevice.requestAccess(for: .video)
+        },
+        isAvailable: {
+            UIImagePickerController.isSourceTypeAvailable(.camera)
+        }
+    )
+
+    static let testValue = Self(
+        authorizationStatus: { .authorized },
+        requestAccess: { true },
+        isAvailable: { true }
+    )
+}
+
+extension DependencyValues {
+    var cameraClient: CameraClient {
+        get { self[CameraClient.self] }
+        set { self[CameraClient.self] = newValue }
+    }
+}
+
 @Reducer
 struct InspectionEditorFeature {
+    @Dependency(\.cameraClient) private var cameraClient
+
     enum Mode: Equatable, Sendable {
         case create
         case view
@@ -27,6 +78,33 @@ struct InspectionEditorFeature {
 
     @ObservableState
     struct State: Equatable {
+        enum CameraError: Equatable, Sendable {
+            case permissionDenied
+            case unavailable
+
+            var title: String {
+                switch self {
+                case .permissionDenied:
+                    "카메라 권한 필요"
+                case .unavailable:
+                    "카메라 사용 불가"
+                }
+            }
+
+            var message: String {
+                switch self {
+                case .permissionDenied:
+                    "점검 사진을 촬영하려면 카메라 접근 권한이 필요합니다. 설정에서 권한을 허용해주세요."
+                case .unavailable:
+                    "이 기기에서는 카메라를 사용할 수 없습니다."
+                }
+            }
+
+            var canOpenSettings: Bool {
+                self == .permissionDenied
+            }
+        }
+
         struct Snapshot: Equatable {
             let photoData: Data?
             let status: InspectionStatus?
@@ -42,6 +120,8 @@ struct InspectionEditorFeature {
         var memo: String
         var originalSnapshot: Snapshot?
         var photoErrorMessage: String?
+        var isCameraPresented = false
+        var cameraError: CameraError?
 
         init(target: InspectionTarget) {
             self.target = target
@@ -53,6 +133,8 @@ struct InspectionEditorFeature {
             self.memo = ""
             self.originalSnapshot = nil
             self.photoErrorMessage = nil
+            self.isCameraPresented = false
+            self.cameraError = nil
         }
 
         init(record: InspectionRecord) {
@@ -69,6 +151,8 @@ struct InspectionEditorFeature {
             self.memo = record.memo
             self.originalSnapshot = nil
             self.photoErrorMessage = nil
+            self.isCameraPresented = false
+            self.cameraError = nil
         }
 
         var snapshot: Snapshot {
@@ -82,6 +166,14 @@ struct InspectionEditorFeature {
         case closeButtonTapped
         case saveButtonTapped
         case cancelButtonTapped
+        case cameraButtonTapped
+        case cameraPresentationRequested
+        case cameraPermissionDenied
+        case cameraUnavailable
+        case cameraImageCaptured(Data)
+        case cameraDismissed
+        case cameraErrorDismissed
+        case deletePhotoButtonTapped
         case photoDataLoaded(Data)
         case photoLoadingFailed
         case delegate(Delegate)
@@ -95,7 +187,7 @@ struct InspectionEditorFeature {
     var body: some ReducerOf<Self> {
         BindingReducer()
 
-        Reduce { state, action in
+        Reduce { (state: inout State, action: Action) -> EffectOf<Self> in
             switch action {
             case .binding:
                 return .none
@@ -125,6 +217,70 @@ struct InspectionEditorFeature {
                 )
 
                 return .send(.delegate(.saved(record)))
+
+            case .cameraButtonTapped:
+                guard state.mode.isEditable else {
+                    return .none
+                }
+
+                state.cameraError = nil
+                let cameraClient = self.cameraClient
+
+                return .run { send in
+                    guard await cameraClient.isAvailable() else {
+                        await send(.cameraUnavailable)
+                        return
+                    }
+
+                    switch await cameraClient.authorizationStatus() {
+                    case .authorized:
+                        await send(.cameraPresentationRequested)
+                    case .notDetermined:
+                        if await cameraClient.requestAccess() {
+                            await send(.cameraPresentationRequested)
+                        } else {
+                            await send(.cameraPermissionDenied)
+                        }
+                    case .denied:
+                        await send(.cameraPermissionDenied)
+                    }
+                }
+
+            case .cameraPresentationRequested:
+                state.isCameraPresented = true
+                return .none
+
+            case let .cameraImageCaptured(data):
+                state.photoData = data
+                state.photoErrorMessage = nil
+                state.isCameraPresented = false
+                state.cameraError = nil
+                return .none
+
+            case .cameraDismissed:
+                state.isCameraPresented = false
+                return .none
+
+            case .cameraPermissionDenied:
+                state.cameraError = .permissionDenied
+                return .none
+
+            case .cameraUnavailable:
+                state.cameraError = .unavailable
+                return .none
+
+            case .cameraErrorDismissed:
+                state.cameraError = nil
+                return .none
+
+            case .deletePhotoButtonTapped:
+                guard state.mode.isEditable else {
+                    return .none
+                }
+
+                state.photoData = nil
+                state.photoErrorMessage = nil
+                return .none
 
             case .cancelButtonTapped:
                 switch state.mode {
@@ -162,6 +318,7 @@ struct InspectionEditorFeature {
 
 struct InspectionEditorView: View {
     @Bindable var store: StoreOf<InspectionEditorFeature>
+    @Environment(\.openURL) private var openURL
     @State private var selectedPhoto: PhotosPickerItem?
 
     var body: some View {
@@ -185,29 +342,7 @@ struct InspectionEditorView: View {
                             .foregroundStyle(.secondary)
                     }
                     
-                    if store.mode.isEditable {
-                        PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                            Label("사진 추가", systemImage: "photo")
-                        }
-                        .onChange(of: selectedPhoto) { _, newItem in
-                            guard let newItem else {
-                                return
-                            }
-                            
-                            Task { @MainActor in
-                                do {
-                                    guard let data = try await newItem.loadTransferable(type: Data.self) else {
-                                        store.send(.photoLoadingFailed)
-                                        return
-                                    }
-                                    
-                                    store.send(.photoDataLoaded(data))
-                                } catch {
-                                    store.send(.photoLoadingFailed)
-                                }
-                            }
-                        }
-                    }
+                    photoActionButtons
                     
                     if let photoErrorMessage = store.photoErrorMessage {
                         Text(photoErrorMessage)
@@ -271,6 +406,230 @@ struct InspectionEditorView: View {
                     }
                 }
             }
+            .fullScreenCover(
+                isPresented: Binding(
+                    get: { store.isCameraPresented },
+                    set: { isPresented in
+                        guard !isPresented else {
+                            return
+                        }
+
+                        store.send(.cameraDismissed)
+                    }
+                )
+            ) {
+                SystemCameraView(
+                    onImagePicked: { image in
+                        guard let data = InspectionPhotoDataNormalizer.normalizedData(from: image) else {
+                            store.send(.photoLoadingFailed)
+                            return
+                        }
+
+                        store.send(.cameraImageCaptured(data))
+                    },
+                    onCancel: {
+                        store.send(.cameraDismissed)
+                    }
+                )
+                .ignoresSafeArea()
+            }
+            .alert(
+                store.cameraError?.title ?? "카메라 오류",
+                isPresented: Binding(
+                    get: { store.cameraError != nil },
+                    set: { isPresented in
+                        guard !isPresented else {
+                            return
+                        }
+
+                        store.send(.cameraErrorDismissed)
+                    }
+                )
+            ) {
+                if store.cameraError?.canOpenSettings == true {
+                    Button("설정 열기") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            openURL(url)
+                        }
+                        store.send(.cameraErrorDismissed)
+                    }
+                }
+
+                Button("확인", role: .cancel) {
+                    store.send(.cameraErrorDismissed)
+                }
+            } message: {
+                Text(store.cameraError?.message ?? "카메라를 사용할 수 없습니다.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var photoActionButtons: some View {
+        switch store.mode {
+        case .create:
+            HStack(spacing: 8) {
+                cameraButton(title: "촬영")
+                photoLibraryButton(title: "선택")
+            }
+            .frame(maxWidth: .infinity)
+            .buttonStyle(.bordered)
+
+        case .editing:
+            let isPhotoMissing = store.photoData == nil
+
+            HStack(spacing: 8) {
+                cameraButton(title: "촬영")
+                photoLibraryButton(title: "선택")
+                Button(role: .destructive) {
+                    store.send(.deletePhotoButtonTapped)
+                } label: {
+                    Label("삭제", systemImage: "trash")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .foregroundStyle(isPhotoMissing ? Color.secondary.opacity(0.75) : Color.red)
+                        .frame(maxWidth: .infinity)
+                }
+                .tint(isPhotoMissing ? Color.secondary.opacity(0.75) : Color.red)
+                .disabled(isPhotoMissing)
+                .frame(maxWidth: .infinity)
+            }
+            .frame(maxWidth: .infinity)
+            .buttonStyle(.bordered)
+
+        case .view:
+            EmptyView()
+        }
+    }
+
+    private func cameraButton(title: String) -> some View {
+        Button {
+            store.send(.cameraButtonTapped)
+        } label: {
+            Label(title, systemImage: "camera")
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func photoLibraryButton(title: String) -> some View {
+        PhotosPicker(selection: $selectedPhoto, matching: .images) {
+            Label(title, systemImage: "photo.on.rectangle")
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity)
+        .onChange(of: selectedPhoto) { _, newItem in
+            guard let newItem else {
+                return
+            }
+
+            Task { @MainActor in
+                defer {
+                    selectedPhoto = nil
+                }
+
+                do {
+                    guard let data = try await newItem.loadTransferable(type: Data.self),
+                          let normalizedData = InspectionPhotoDataNormalizer.normalizedData(from: data)
+                    else {
+                        store.send(.photoLoadingFailed)
+                        return
+                    }
+
+                    store.send(.photoDataLoaded(normalizedData))
+                } catch {
+                    store.send(.photoLoadingFailed)
+                }
+            }
+        }
+    }
+}
+
+@MainActor
+private enum InspectionPhotoDataNormalizer {
+    private static let maximumDimension: CGFloat = 2_048
+    private static let compressionQuality: CGFloat = 0.8
+
+    static func normalizedData(from data: Data) -> Data? {
+        guard let image = UIImage(data: data) else {
+            return nil
+        }
+
+        return normalizedData(from: image)
+    }
+
+    static func normalizedData(from image: UIImage) -> Data? {
+        let longestSide = max(image.size.width, image.size.height)
+        guard longestSide > 0 else {
+            return nil
+        }
+
+        let scale = min(1, maximumDimension / longestSide)
+        let targetSize = CGSize(
+            width: max(1, image.size.width * scale),
+            height: max(1, image.size.height * scale)
+        )
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        let renderedImage = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+
+        return renderedImage.jpegData(compressionQuality: compressionQuality)
+    }
+}
+
+struct SystemCameraView: UIViewControllerRepresentable {
+    let onImagePicked: (UIImage) -> Void
+    let onCancel: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            onImagePicked: onImagePicked,
+            onCancel: onCancel
+        )
+    }
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.cameraCaptureMode = .photo
+        picker.allowsEditing = false
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let onImagePicked: (UIImage) -> Void
+        let onCancel: () -> Void
+
+        init(
+            onImagePicked: @escaping (UIImage) -> Void,
+            onCancel: @escaping () -> Void
+        ) {
+            self.onImagePicked = onImagePicked
+            self.onCancel = onCancel
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            guard let image = info[.originalImage] as? UIImage else {
+                onCancel()
+                return
+            }
+
+            onImagePicked(image)
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            onCancel()
         }
     }
 }

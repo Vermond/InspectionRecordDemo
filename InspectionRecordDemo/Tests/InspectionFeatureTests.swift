@@ -127,6 +127,31 @@ final class InspectionFeatureTests: XCTestCase {
         }
     }
 
+    func testSavingInspectionRecordKeepsEditorOpenWhenPersistenceFails() async {
+        let target = makeTarget()
+        let record = makeRecord(for: target, photoData: nil)
+        var initialState = InspectionListFeature.State()
+        initialState.targets = [target]
+        initialState.destination = .inspection(InspectionEditorFeature.State(target: target))
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        } withDependencies: {
+            $0.inspectionRepository = makeRepository(
+                saveRecord: { _ in
+                    throw InspectionPersistenceError.saveFailed
+                }
+            )
+        }
+
+        await store.send(
+            .destination(.presented(.inspection(.delegate(.saved(record)))))
+        )
+        await store.receive(\.persistenceFailed) {
+            $0.persistenceErrorMessage = InspectionPersistenceError.saveFailed.userMessage
+        }
+        XCTAssertNotNil(store.state.destination)
+    }
+
     func testLatestRecordAndHistorySearchUseCurrentState() {
         let target = makeTarget()
         let olderRecord = makeRecord(
@@ -173,6 +198,197 @@ final class InspectionFeatureTests: XCTestCase {
         await store.receive(\.delegate, .cancelled)
     }
 
+    func testCameraButtonPresentsCameraWhenAuthorized() async {
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(target: makeTarget())
+        ) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.cameraClient = CameraClient(
+                authorizationStatus: { .authorized },
+                requestAccess: { false },
+                isAvailable: { true }
+            )
+        }
+
+        await store.send(.cameraButtonTapped)
+        await store.receive(\.cameraPresentationRequested) {
+            $0.isCameraPresented = true
+        }
+    }
+
+    func testCameraButtonRequestsPermissionAndShowsErrorWhenDenied() async {
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(target: makeTarget())
+        ) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.cameraClient = CameraClient(
+                authorizationStatus: { .notDetermined },
+                requestAccess: { false },
+                isAvailable: { true }
+            )
+        }
+
+        await store.send(.cameraButtonTapped)
+        await store.receive(\.cameraPermissionDenied) {
+            $0.cameraError = .permissionDenied
+        }
+    }
+
+    func testCameraButtonShowsUnavailableErrorWhenCameraIsUnavailable() async {
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(target: makeTarget())
+        ) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.cameraClient = CameraClient(
+                authorizationStatus: { .authorized },
+                requestAccess: { true },
+                isAvailable: { false }
+            )
+        }
+
+        await store.send(.cameraButtonTapped)
+        await store.receive(\.cameraUnavailable) {
+            $0.cameraError = .unavailable
+        }
+    }
+
+    func testCameraButtonShowsErrorWhenPermissionWasAlreadyDenied() async {
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(target: makeTarget())
+        ) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.cameraClient = CameraClient(
+                authorizationStatus: { .denied },
+                requestAccess: { true },
+                isAvailable: { true }
+            )
+        }
+
+        await store.send(.cameraButtonTapped)
+        await store.receive(\.cameraPermissionDenied) {
+            $0.cameraError = .permissionDenied
+        }
+    }
+
+    func testCameraButtonPresentsCameraAfterPermissionRequestSucceeds() async {
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(target: makeTarget())
+        ) {
+            InspectionEditorFeature()
+        } withDependencies: {
+            $0.cameraClient = CameraClient(
+                authorizationStatus: { .notDetermined },
+                requestAccess: { true },
+                isAvailable: { true }
+            )
+        }
+
+        await store.send(.cameraButtonTapped)
+        await store.receive(\.cameraPresentationRequested) {
+            $0.isCameraPresented = true
+        }
+    }
+
+    func testCapturedCameraImageReplacesCurrentPhoto() async {
+        var initialState = InspectionEditorFeature.State(target: makeTarget())
+        initialState.photoData = Data([9])
+        initialState.isCameraPresented = true
+        initialState.cameraError = .unavailable
+        initialState.photoErrorMessage = "기존 오류"
+
+        let store = TestStore(
+            initialState: initialState
+        ) {
+            InspectionEditorFeature()
+        }
+        let photoData = Data([1, 2, 3])
+
+        await store.send(.cameraImageCaptured(photoData)) {
+            $0.photoData = photoData
+            $0.isCameraPresented = false
+            $0.cameraError = nil
+            $0.photoErrorMessage = nil
+        }
+    }
+
+    func testPhotoDataLoadedReplacesCurrentPhotoAndClearsError() async {
+        var initialState = InspectionEditorFeature.State(target: makeTarget())
+        initialState.photoData = Data([9])
+        initialState.photoErrorMessage = "기존 오류"
+
+        let store = TestStore(initialState: initialState) {
+            InspectionEditorFeature()
+        }
+        let photoData = Data([4, 5, 6])
+
+        await store.send(.photoDataLoaded(photoData)) {
+            $0.photoData = photoData
+            $0.photoErrorMessage = nil
+        }
+    }
+
+    func testPhotoLoadingFailedKeepsExistingPhotoAndShowsError() async {
+        var initialState = InspectionEditorFeature.State(target: makeTarget())
+        initialState.photoData = Data([9])
+
+        let store = TestStore(initialState: initialState) {
+            InspectionEditorFeature()
+        }
+
+        await store.send(.photoLoadingFailed) {
+            $0.photoErrorMessage = "사진을 불러오지 못했습니다."
+        }
+
+        XCTAssertEqual(store.state.photoData, Data([9]))
+    }
+
+    func testDeletePhotoClearsPhotoInEditingMode() async {
+        let target = makeTarget()
+        let record = makeRecord(for: target, photoData: Data([1, 2, 3]))
+        var initialState = InspectionEditorFeature.State(record: record)
+        initialState.mode = .editing
+        initialState.photoData = Data([1, 2, 3])
+
+        let store = TestStore(initialState: initialState) {
+            InspectionEditorFeature()
+        }
+
+        await store.send(.deletePhotoButtonTapped) {
+            $0.photoData = nil
+        }
+    }
+
+    func testDeletingPhotoThenSavingSendsRecordWithoutPhoto() async {
+        let target = makeTarget()
+        let originalRecord = makeRecord(for: target, photoData: Data([1, 2, 3]))
+        var initialState = InspectionEditorFeature.State(record: originalRecord)
+        initialState.mode = .editing
+
+        let store = TestStore(initialState: initialState) {
+            InspectionEditorFeature()
+        }
+        let expectedRecord = InspectionRecord(
+            id: originalRecord.id,
+            targetID: originalRecord.targetID,
+            targetName: originalRecord.targetName,
+            equipmentNumber: originalRecord.equipmentNumber,
+            createdAt: originalRecord.createdAt,
+            photoData: nil,
+            status: originalRecord.status,
+            memo: originalRecord.memo
+        )
+
+        await store.send(.deletePhotoButtonTapped) {
+            $0.photoData = nil
+        }
+        await store.send(.saveButtonTapped)
+        await store.receive(\.delegate, .saved(expectedRecord))
+    }
+
     func testInspectionEditingCancelRestoresOriginalSnapshot() async {
         let target = makeTarget()
         let record = makeRecord(for: target, status: .normal, memo: "기존 메모")
@@ -192,6 +408,64 @@ final class InspectionFeatureTests: XCTestCase {
         }
         await store.send(.binding(.set(\.memo, "변경된 메모"))) {
             $0.memo = "변경된 메모"
+        }
+        await store.send(.cancelButtonTapped) {
+            $0.mode = .view
+            $0.photoData = record.photoData
+            $0.status = record.status
+            $0.memo = record.memo
+            $0.originalSnapshot = nil
+        }
+    }
+
+    func testInspectionEditingCancelRestoresOriginalPhotoAfterReplacement() async {
+        let target = makeTarget()
+        let record = makeRecord(for: target, photoData: Data([1]), status: .normal)
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(record: record)
+        ) {
+            InspectionEditorFeature()
+        }
+
+        await store.send(.editButtonTapped) {
+            $0.mode = .editing
+            $0.originalSnapshot = InspectionEditorFeature.State.Snapshot(
+                photoData: record.photoData,
+                status: record.status,
+                memo: record.memo
+            )
+        }
+        await store.send(.cameraImageCaptured(Data([2]))) {
+            $0.photoData = Data([2])
+        }
+        await store.send(.cancelButtonTapped) {
+            $0.mode = .view
+            $0.photoData = record.photoData
+            $0.status = record.status
+            $0.memo = record.memo
+            $0.originalSnapshot = nil
+        }
+    }
+
+    func testInspectionEditingCancelRestoresOriginalPhotoAfterDeletion() async {
+        let target = makeTarget()
+        let record = makeRecord(for: target, photoData: Data([1]), status: .normal)
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(record: record)
+        ) {
+            InspectionEditorFeature()
+        }
+
+        await store.send(.editButtonTapped) {
+            $0.mode = .editing
+            $0.originalSnapshot = InspectionEditorFeature.State.Snapshot(
+                photoData: record.photoData,
+                status: record.status,
+                memo: record.memo
+            )
+        }
+        await store.send(.deletePhotoButtonTapped) {
+            $0.photoData = nil
         }
         await store.send(.cancelButtonTapped) {
             $0.mode = .view
@@ -226,6 +500,7 @@ final class InspectionFeatureTests: XCTestCase {
     private func makeRecord(
         for target: InspectionTarget,
         createdAt: Date = Date(timeIntervalSince1970: 1_000),
+        photoData: Data? = nil,
         status: InspectionStatus? = .normal,
         memo: String = ""
     ) -> InspectionRecord {
@@ -235,7 +510,7 @@ final class InspectionFeatureTests: XCTestCase {
             targetName: target.name,
             equipmentNumber: target.equipmentNumber,
             createdAt: createdAt,
-            photoData: nil,
+            photoData: photoData,
             status: status,
             memo: memo
         )
