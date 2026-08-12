@@ -446,10 +446,10 @@ final class InspectionFeatureTests: XCTestCase {
 
             return true
         } assert: {
-            $0.isLocationIntroductionPresented = true
+            $0.locationPrompt = .introduction(.preparation)
         }
         await store.send(.locationIntroductionConfirmed) {
-            $0.isLocationIntroductionPresented = false
+            $0.locationPrompt = nil
             $0.isLocationLoading = true
         }
         await store.receive { action in
@@ -494,11 +494,11 @@ final class InspectionFeatureTests: XCTestCase {
 
             return true
         } assert: {
-            $0.isLocationIntroductionPresented = true
+            $0.locationPrompt = .introduction(.preparation)
         }
 
         await store.send(.locationIntroductionConfirmed) {
-            $0.isLocationIntroductionPresented = false
+            $0.locationPrompt = nil
             $0.isLocationLoading = true
         }
         await store.receive { action in
@@ -509,7 +509,7 @@ final class InspectionFeatureTests: XCTestCase {
             return true
         } assert: {
             $0.isLocationLoading = false
-            $0.isLocationPermissionDeniedPresented = false
+            $0.locationPrompt = nil
         }
     }
 
@@ -534,11 +534,11 @@ final class InspectionFeatureTests: XCTestCase {
 
             return true
         } assert: {
-            $0.isLocationPermissionDeniedPresented = true
+            $0.locationPrompt = .permissionDenied
         }
 
         await store.send(.locationPermissionDeniedDismissed) {
-            $0.isLocationPermissionDeniedPresented = false
+            $0.locationPrompt = nil
         }
     }
 

@@ -297,6 +297,11 @@ struct InspectionEditorFeature {
 
     @ObservableState
     struct State: Equatable {
+        enum LocationPrompt: Equatable, Sendable {
+            case introduction(LocationRequestSource)
+            case permissionDenied
+        }
+
         enum CameraError: Equatable, Sendable {
             case permissionDenied
             case unavailable
@@ -362,9 +367,7 @@ struct InspectionEditorFeature {
         var longitude: Double?
         var locationCapturedAt: Date?
         var isLocationLoading = false
-        var isLocationIntroductionPresented = false
-        var isLocationPermissionDeniedPresented = false
-        var locationRequestSource: LocationRequestSource?
+        var locationPrompt: LocationPrompt?
         var isSaving = false
         var originalSnapshot: Snapshot?
         var photoErrorMessage: String?
@@ -520,42 +523,16 @@ struct InspectionEditorFeature {
                 return .send(.delegate(.saved(record)))
 
             case .locationPreparationRequested:
-                guard state.mode == .create,
-                      !state.isSaving,
-                      !state.isLocationLoading
-                else {
-                    return .none
-                }
-
-                state.locationRequestSource = .preparation
-                let locationClient = self.locationClient
-                return .run { send in
-                    await send(
-                        .locationAuthorizationChecked(
-                            await locationClient.authorizationStatus(),
-                            .preparation
-                        )
-                    )
-                }
+                return requestLocationAuthorization(
+                    source: .preparation,
+                    state: &state
+                )
 
             case .locationRefreshButtonTapped:
-                guard state.mode == .create,
-                      !state.isSaving,
-                      !state.isLocationLoading
-                else {
-                    return .none
-                }
-
-                state.locationRequestSource = .refresh
-                let locationClient = self.locationClient
-                return .run { send in
-                    await send(
-                        .locationAuthorizationChecked(
-                            await locationClient.authorizationStatus(),
-                            .refresh
-                        )
-                    )
-                }
+                return requestLocationAuthorization(
+                    source: .refresh,
+                    state: &state
+                )
 
             case let .locationAuthorizationChecked(status, source):
                 guard state.mode == .create else {
@@ -564,7 +541,7 @@ struct InspectionEditorFeature {
 
                 switch status {
                 case .authorized:
-                    state.locationRequestSource = nil
+                    state.locationPrompt = nil
                     state.isLocationLoading = true
                     let locationClient = self.locationClient
 
@@ -579,14 +556,12 @@ struct InspectionEditorFeature {
 
                 case .notDetermined:
                     state.isLocationLoading = false
-                    state.locationRequestSource = source
-                    state.isLocationIntroductionPresented = true
+                    state.locationPrompt = .introduction(source)
                     return .none
 
                 case .denied:
                     state.isLocationLoading = false
-                    state.locationRequestSource = nil
-                    state.isLocationPermissionDeniedPresented = source == .refresh
+                    state.locationPrompt = source == .refresh ? .permissionDenied : nil
                     return .none
                 }
 
@@ -595,11 +570,11 @@ struct InspectionEditorFeature {
                     return .none
                 }
 
-                guard let source = state.locationRequestSource else {
+                guard case let .introduction(source) = state.locationPrompt else {
                     return .none
                 }
 
-                state.isLocationIntroductionPresented = false
+                state.locationPrompt = nil
                 state.isLocationLoading = true
                 let locationClient = self.locationClient
                 return .run { send in
@@ -613,13 +588,11 @@ struct InspectionEditorFeature {
                 .cancellable(id: LocationRequestID.current, cancelInFlight: true)
 
             case .locationIntroductionDismissed:
-                state.isLocationIntroductionPresented = false
-                state.locationRequestSource = nil
+                state.locationPrompt = nil
                 return .none
 
             case .locationPermissionDeniedDismissed:
-                state.isLocationPermissionDeniedPresented = false
-                state.locationRequestSource = nil
+                state.locationPrompt = nil
                 return .none
 
             case let .locationUpdated(sample):
@@ -763,6 +736,28 @@ struct InspectionEditorFeature {
         }
     }
 
+    private func requestLocationAuthorization(
+        source: LocationRequestSource,
+        state: inout State
+    ) -> EffectOf<Self> {
+        guard state.mode == .create,
+              !state.isSaving,
+              !state.isLocationLoading
+        else {
+            return .none
+        }
+
+        let locationClient = self.locationClient
+        return .run { send in
+            await send(
+                .locationAuthorizationChecked(
+                    await locationClient.authorizationStatus(),
+                    source
+                )
+            )
+        }
+    }
+
     private static func makeRecord(
         from state: State,
         updatedAt: Date,
@@ -878,18 +873,17 @@ struct InspectionEditorView: View {
                 await store.send(.locationPreparationRequested).finish()
             }
             .alert(
-                store.isLocationPermissionDeniedPresented ? "위치 권한 필요" : "위치 기록 안내",
+                store.locationPrompt == .permissionDenied ? "위치 권한 필요" : "위치 기록 안내",
                 isPresented: Binding(
                     get: {
-                        store.isLocationIntroductionPresented
-                            || store.isLocationPermissionDeniedPresented
+                        store.locationPrompt != nil
                     },
                     set: { isPresented in
                         guard !isPresented else {
                             return
                         }
 
-                        if store.isLocationPermissionDeniedPresented {
+                        if store.locationPrompt == .permissionDenied {
                             store.send(.locationPermissionDeniedDismissed)
                         } else {
                             store.send(.locationIntroductionDismissed)
@@ -897,7 +891,7 @@ struct InspectionEditorView: View {
                     }
                 )
             ) {
-                if store.isLocationPermissionDeniedPresented {
+                if store.locationPrompt == .permissionDenied {
                     Button("설정 열기") {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
                             openURL(url)
@@ -917,7 +911,7 @@ struct InspectionEditorView: View {
                 }
             } message: {
                 Text(
-                    store.isLocationPermissionDeniedPresented
+                    store.locationPrompt == .permissionDenied
                         ? "위치 권한이 거부되어 점검 당시 위치를 기록할 수 없습니다. 위치 정보를 기록하려면 설정에서 권한을 허용해주세요."
                         : "점검 당시 위치를 자동으로 기록합니다. 위치 권한을 허용하면 점검 저장 시 위도와 경도를 함께 보관할 수 있습니다."
                 )
