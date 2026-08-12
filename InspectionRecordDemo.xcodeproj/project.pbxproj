@@ -13,9 +13,22 @@
 		A00000000000000000000020 /* InspectionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001D /* InspectionModels.swift */; };
 		A00000000000000000000021 /* InspectionListFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001E /* InspectionListFeature.swift */; };
 		A00000000000000000000022 /* InspectionEditorFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001F /* InspectionEditorFeature.swift */; };
+		A00000000000000000000037 /* InspectionEditorLocationClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003A /* InspectionEditorLocationClient.swift */; };
+		A00000000000000000000038 /* InspectionEditorCameraClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003B /* InspectionEditorCameraClient.swift */; };
+		A00000000000000000000039 /* InspectionEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003C /* InspectionEditorView.swift */; };
+		A00000000000000000000042 /* LocationPreferencesClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000050 /* LocationPreferencesClient.swift */; };
+		A00000000000000000000043 /* TargetFormFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000051 /* TargetFormFeature.swift */; };
+		A00000000000000000000044 /* TargetFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000052 /* TargetFormView.swift */; };
+		A00000000000000000000045 /* InspectionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000053 /* InspectionListView.swift */; };
+		A00000000000000000000046 /* InspectionTargetsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000054 /* InspectionTargetsView.swift */; };
+		A00000000000000000000047 /* InspectionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000055 /* InspectionHistoryView.swift */; };
+		A00000000000000000000048 /* InspectionEditorPhotoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000056 /* InspectionEditorPhotoSection.swift */; };
+		A00000000000000000000049 /* SystemCameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000057 /* SystemCameraView.swift */; };
+		A0000000000000000000004A /* InspectionPhotoDataNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000058 /* InspectionPhotoDataNormalizer.swift */; };
 		A00000000000000000000023 /* InspectionPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000024 /* InspectionPersistence.swift */; };
 		A00000000000000000000026 /* InspectionPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000029 /* InspectionPersistenceTests.swift */; };
-		A00000000000000000000027 /* InspectionFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000002A /* InspectionFeatureTests.swift */; };
+		A00000000000000000000040 /* InspectionListFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003D /* InspectionListFeatureTests.swift */; };
+		A00000000000000000000041 /* InspectionEditorFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003E /* InspectionEditorFeatureTests.swift */; };
 		A00000000000000000000035 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000036 /* XCTest.framework */; };
 /* End PBXBuildFile section */
 
@@ -39,9 +52,22 @@
 		A0000000000000000000001D /* InspectionModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionModels.swift; sourceTree = "<group>"; };
 		A0000000000000000000001E /* InspectionListFeature.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionListFeature.swift; sourceTree = "<group>"; };
 		A0000000000000000000001F /* InspectionEditorFeature.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionEditorFeature.swift; sourceTree = "<group>"; };
+		A0000000000000000000003A /* InspectionEditorLocationClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionEditorLocationClient.swift; sourceTree = "<group>"; };
+		A0000000000000000000003B /* InspectionEditorCameraClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionEditorCameraClient.swift; sourceTree = "<group>"; };
+		A0000000000000000000003C /* InspectionEditorView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionEditorView.swift; sourceTree = "<group>"; };
+		A00000000000000000000050 /* LocationPreferencesClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LocationPreferencesClient.swift; sourceTree = "<group>"; };
+		A00000000000000000000051 /* TargetFormFeature.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TargetFormFeature.swift; sourceTree = "<group>"; };
+		A00000000000000000000052 /* TargetFormView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TargetFormView.swift; sourceTree = "<group>"; };
+		A00000000000000000000053 /* InspectionListView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionListView.swift; sourceTree = "<group>"; };
+		A00000000000000000000054 /* InspectionTargetsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionTargetsView.swift; sourceTree = "<group>"; };
+		A00000000000000000000055 /* InspectionHistoryView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionHistoryView.swift; sourceTree = "<group>"; };
+		A00000000000000000000056 /* InspectionEditorPhotoSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionEditorPhotoSection.swift; sourceTree = "<group>"; };
+		A00000000000000000000057 /* SystemCameraView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SystemCameraView.swift; sourceTree = "<group>"; };
+		A00000000000000000000058 /* InspectionPhotoDataNormalizer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionPhotoDataNormalizer.swift; sourceTree = "<group>"; };
 		A00000000000000000000024 /* InspectionPersistence.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionPersistence.swift; sourceTree = "<group>"; };
 		A00000000000000000000029 /* InspectionPersistenceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionPersistenceTests.swift; sourceTree = "<group>"; };
-		A0000000000000000000002A /* InspectionFeatureTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionFeatureTests.swift; sourceTree = "<group>"; };
+		A0000000000000000000003D /* InspectionListFeatureTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionListFeatureTests.swift; sourceTree = "<group>"; };
+		A0000000000000000000003E /* InspectionEditorFeatureTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionEditorFeatureTests.swift; sourceTree = "<group>"; };
 		A0000000000000000000002B /* InspectionRecordDemoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = InspectionRecordDemoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000036 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -117,6 +143,12 @@
 			isa = PBXGroup;
 			children = (
 				A0000000000000000000001E /* InspectionListFeature.swift */,
+				A00000000000000000000050 /* LocationPreferencesClient.swift */,
+				A00000000000000000000051 /* TargetFormFeature.swift */,
+				A00000000000000000000052 /* TargetFormView.swift */,
+				A00000000000000000000053 /* InspectionListView.swift */,
+				A00000000000000000000054 /* InspectionTargetsView.swift */,
+				A00000000000000000000055 /* InspectionHistoryView.swift */,
 			);
 			path = InspectionList;
 			sourceTree = "<group>";
@@ -125,6 +157,12 @@
 			isa = PBXGroup;
 			children = (
 				A0000000000000000000001F /* InspectionEditorFeature.swift */,
+				A0000000000000000000003A /* InspectionEditorLocationClient.swift */,
+				A0000000000000000000003B /* InspectionEditorCameraClient.swift */,
+				A0000000000000000000003C /* InspectionEditorView.swift */,
+				A00000000000000000000056 /* InspectionEditorPhotoSection.swift */,
+				A00000000000000000000057 /* SystemCameraView.swift */,
+				A00000000000000000000058 /* InspectionPhotoDataNormalizer.swift */,
 			);
 			path = InspectionEditor;
 			sourceTree = "<group>";
@@ -141,7 +179,8 @@
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000029 /* InspectionPersistenceTests.swift */,
-				A0000000000000000000002A /* InspectionFeatureTests.swift */,
+				A0000000000000000000003D /* InspectionListFeatureTests.swift */,
+				A0000000000000000000003E /* InspectionEditorFeatureTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -274,6 +313,18 @@
 				A00000000000000000000020 /* InspectionModels.swift in Sources */,
 				A00000000000000000000021 /* InspectionListFeature.swift in Sources */,
 				A00000000000000000000022 /* InspectionEditorFeature.swift in Sources */,
+				A00000000000000000000037 /* InspectionEditorLocationClient.swift in Sources */,
+				A00000000000000000000038 /* InspectionEditorCameraClient.swift in Sources */,
+				A00000000000000000000039 /* InspectionEditorView.swift in Sources */,
+				A00000000000000000000042 /* LocationPreferencesClient.swift in Sources */,
+				A00000000000000000000043 /* TargetFormFeature.swift in Sources */,
+				A00000000000000000000044 /* TargetFormView.swift in Sources */,
+				A00000000000000000000045 /* InspectionListView.swift in Sources */,
+				A00000000000000000000046 /* InspectionTargetsView.swift in Sources */,
+				A00000000000000000000047 /* InspectionHistoryView.swift in Sources */,
+				A00000000000000000000048 /* InspectionEditorPhotoSection.swift in Sources */,
+				A00000000000000000000049 /* SystemCameraView.swift in Sources */,
+				A0000000000000000000004A /* InspectionPhotoDataNormalizer.swift in Sources */,
 				A00000000000000000000023 /* InspectionPersistence.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -283,7 +334,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A00000000000000000000026 /* InspectionPersistenceTests.swift in Sources */,
-				A00000000000000000000027 /* InspectionFeatureTests.swift in Sources */,
+				A00000000000000000000040 /* InspectionListFeatureTests.swift in Sources */,
+				A00000000000000000000041 /* InspectionEditorFeatureTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
