@@ -4,6 +4,8 @@ import SwiftUI
 
 @Reducer
 struct InspectionListFeature {
+    @Dependency(\.inspectionRepository) private var inspectionRepository
+
     @ObservableState
     struct State: Equatable {
         enum Tab: String, CaseIterable, Equatable, Hashable, Sendable {
@@ -33,6 +35,9 @@ struct InspectionListFeature {
         var targets: [InspectionTarget] = []
         var records: [InspectionRecord] = []
         var searchText = ""
+        var isLoading = false
+        var hasLoadedPersistence = false
+        var persistenceErrorMessage: String?
         @Presents var destination: Destination.State?
 
         var filteredRecords: [InspectionRecord] {
@@ -60,6 +65,12 @@ struct InspectionListFeature {
 
     enum Action: BindableAction {
         case binding(BindingAction<State>)
+        case task
+        case persistenceLoaded(Result<InspectionRepository.Snapshot, InspectionPersistenceError>)
+        case targetPersisted(InspectionTarget)
+        case recordPersisted(InspectionRecord)
+        case persistenceFailed(InspectionPersistenceError)
+        case persistenceErrorDismissed
         case addTargetButtonTapped
         case targetSelected(InspectionTarget.ID)
         case recordSelected(InspectionRecord.ID)
@@ -78,6 +89,93 @@ struct InspectionListFeature {
         Reduce { state, action in
             switch action {
             case .binding:
+                return .none
+
+            case .task:
+                guard !state.hasLoadedPersistence, !state.isLoading else {
+                    return .none
+                }
+
+                state.isLoading = true
+                let repository = self.inspectionRepository
+
+                return .run { send in
+                    do {
+                        let snapshot = try await repository.load()
+                        await send(.persistenceLoaded(.success(snapshot)))
+                    } catch let error as InspectionPersistenceError {
+                        await send(.persistenceLoaded(.failure(error)))
+                    } catch {
+                        await send(.persistenceLoaded(.failure(.loadFailed)))
+                    }
+                }
+
+            case let .persistenceLoaded(.success(snapshot)):
+                state.targets = snapshot.targets
+                state.records = snapshot.records
+                state.isLoading = false
+                state.hasLoadedPersistence = true
+                state.persistenceErrorMessage = nil
+                return .none
+
+            case let .persistenceLoaded(.failure(error)):
+                state.isLoading = false
+                state.hasLoadedPersistence = true
+                state.persistenceErrorMessage = error.userMessage
+                return .none
+
+            case let .destination(.presented(.targetForm(.delegate(.saved(target))))):
+                let repository = self.inspectionRepository
+
+                return .run { send in
+                    do {
+                        try await repository.saveTarget(target)
+                        await send(.targetPersisted(target))
+                    } catch let error as InspectionPersistenceError {
+                        await send(.persistenceFailed(error))
+                    } catch {
+                        await send(.persistenceFailed(.saveFailed))
+                    }
+                }
+
+            case let .targetPersisted(target):
+                if !state.targets.contains(where: { $0.id == target.id }) {
+                    state.targets.append(target)
+                }
+
+                state.destination = nil
+                return .none
+
+            case let .destination(.presented(.inspection(.delegate(.saved(record))))):
+                let repository = self.inspectionRepository
+
+                return .run { send in
+                    do {
+                        try await repository.saveRecord(record)
+                        await send(.recordPersisted(record))
+                    } catch let error as InspectionPersistenceError {
+                        await send(.persistenceFailed(error))
+                    } catch {
+                        await send(.persistenceFailed(.saveFailed))
+                    }
+                }
+
+            case let .recordPersisted(record):
+                if let index = state.records.firstIndex(where: { $0.id == record.id }) {
+                    state.records[index] = record
+                } else {
+                    state.records.insert(record, at: 0)
+                }
+
+                state.destination = nil
+                return .none
+
+            case let .persistenceFailed(error):
+                state.persistenceErrorMessage = error.userMessage
+                return .none
+
+            case .persistenceErrorDismissed:
+                state.persistenceErrorMessage = nil
                 return .none
 
             case .addTargetButtonTapped:
@@ -100,22 +198,7 @@ struct InspectionListFeature {
                 state.destination = .inspection(InspectionEditorFeature.State(record: record))
                 return .none
 
-            case let .destination(.presented(.targetForm(.delegate(.saved(target))))):
-                state.targets.append(target)
-                state.destination = nil
-                return .none
-
             case .destination(.presented(.targetForm(.delegate(.cancelled)))):
-                state.destination = nil
-                return .none
-
-            case let .destination(.presented(.inspection(.delegate(.saved(record))))):
-                if let index = state.records.firstIndex(where: { $0.id == record.id }) {
-                    state.records[index] = record
-                } else {
-                    state.records.insert(record, at: 0)
-                }
-
                 state.destination = nil
                 return .none
 
@@ -155,7 +238,7 @@ struct TargetFormFeature {
         enum Delegate: Equatable {
             case saved(InspectionTarget)
             case cancelled
-        }
+        }	
     }
 
     var body: some ReducerOf<Self> {
@@ -225,6 +308,25 @@ struct InspectionListView: View {
             )
         ) { inspectionStore in
             InspectionEditorView(store: inspectionStore)
+        }
+        .task {
+            await store.send(.task).finish()
+        }
+        .alert(
+            "점검 데이터 오류",
+            isPresented: Binding(
+                get: { store.persistenceErrorMessage != nil },
+                set: { isPresented in
+                    guard !isPresented else { return }
+                    store.send(.persistenceErrorDismissed)
+                }
+            )
+        ) {
+            Button("확인") {
+                store.send(.persistenceErrorDismissed)
+            }
+        } message: {
+            Text(store.persistenceErrorMessage ?? "점검 데이터를 처리하지 못했습니다.")
         }
     }
 
