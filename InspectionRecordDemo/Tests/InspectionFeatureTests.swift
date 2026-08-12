@@ -17,8 +17,10 @@ final class InspectionFeatureTests: XCTestCase {
         } withDependencies: {
             $0.inspectionRepository = InspectionRepository(
                 load: { snapshot },
+                loadPendingRecords: { [] },
                 saveTarget: { _ in },
-                saveRecord: { _ in }
+                saveRecord: { _ in },
+                updateSyncStatus: { _, _ in }
             )
         }
 
@@ -102,12 +104,14 @@ final class InspectionFeatureTests: XCTestCase {
         let updatedRecord = InspectionRecord(
             id: originalRecord.id,
             targetID: originalRecord.targetID,
-            targetName: originalRecord.targetName,
-            equipmentNumber: originalRecord.equipmentNumber,
+            targetNameSnapshot: originalRecord.targetNameSnapshot,
+            equipmentNumberSnapshot: originalRecord.equipmentNumberSnapshot,
             createdAt: originalRecord.createdAt,
+            updatedAt: Date(timeIntervalSince1970: 1_000_060),
             photoData: Data([9]),
             status: .abnormal,
-            memo: "수정"
+            memo: "수정",
+            syncStatus: .pending
         )
         var initialState = InspectionListFeature.State()
         initialState.records = [originalRecord]
@@ -196,6 +200,73 @@ final class InspectionFeatureTests: XCTestCase {
 
         await store.send(.closeButtonTapped)
         await store.receive(\.delegate, .cancelled)
+    }
+
+    func testCreatingInspectionRecordUsesCreatedAtAsUpdatedAtAndPendingStatus() async {
+        let target = makeTarget()
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(target: target)
+        ) {
+            InspectionEditorFeature()
+        }
+        let createdAt = store.state.createdAt
+
+        await store.send(.saveButtonTapped)
+        await store.receive { action in
+            guard case let .delegate(.saved(record)) = action else {
+                return false
+            }
+
+            XCTAssertEqual(record.targetNameSnapshot, target.name)
+            XCTAssertEqual(record.equipmentNumberSnapshot, target.equipmentNumber)
+            XCTAssertEqual(record.createdAt, createdAt)
+            XCTAssertEqual(record.updatedAt, createdAt)
+            XCTAssertEqual(record.syncStatus, .pending)
+            return true
+        }
+    }
+
+    func testEditingInspectionRecordKeepsCreatedAtUpdatesUpdatedAtAndSetsPendingStatus() async {
+        let target = makeTarget()
+        let originalCreatedAt = Date(timeIntervalSince1970: 1_000)
+        let originalUpdatedAt = Date(timeIntervalSince1970: 2_000)
+        let originalRecord = InspectionRecord(
+            id: UUID(),
+            targetID: target.id,
+            targetNameSnapshot: target.name,
+            equipmentNumberSnapshot: target.equipmentNumber,
+            createdAt: originalCreatedAt,
+            updatedAt: originalUpdatedAt,
+            photoData: nil,
+            status: .normal,
+            memo: "기존",
+            syncStatus: .synced
+        )
+        let store = TestStore(
+            initialState: InspectionEditorFeature.State(record: originalRecord)
+        ) {
+            InspectionEditorFeature()
+        }
+
+        await store.send(.editButtonTapped) {
+            $0.mode = .editing
+            $0.originalSnapshot = InspectionEditorFeature.State.Snapshot(
+                photoData: originalRecord.photoData,
+                status: originalRecord.status,
+                memo: originalRecord.memo
+            )
+        }
+        await store.send(.saveButtonTapped)
+        await store.receive { action in
+            guard case let .delegate(.saved(record)) = action else {
+                return false
+            }
+
+            XCTAssertEqual(record.createdAt, originalCreatedAt)
+            XCTAssertGreaterThan(record.updatedAt, originalUpdatedAt)
+            XCTAssertEqual(record.syncStatus, .pending)
+            return true
+        }
     }
 
     func testCameraButtonPresentsCameraWhenAuthorized() async {
@@ -371,22 +442,28 @@ final class InspectionFeatureTests: XCTestCase {
         let store = TestStore(initialState: initialState) {
             InspectionEditorFeature()
         }
-        let expectedRecord = InspectionRecord(
-            id: originalRecord.id,
-            targetID: originalRecord.targetID,
-            targetName: originalRecord.targetName,
-            equipmentNumber: originalRecord.equipmentNumber,
-            createdAt: originalRecord.createdAt,
-            photoData: nil,
-            status: originalRecord.status,
-            memo: originalRecord.memo
-        )
 
         await store.send(.deletePhotoButtonTapped) {
             $0.photoData = nil
         }
         await store.send(.saveButtonTapped)
-        await store.receive(\.delegate, .saved(expectedRecord))
+        await store.receive { action in
+            guard case let .delegate(.saved(record)) = action else {
+                return false
+            }
+
+            XCTAssertEqual(record.id, originalRecord.id)
+            XCTAssertEqual(record.targetID, originalRecord.targetID)
+            XCTAssertEqual(record.targetNameSnapshot, originalRecord.targetNameSnapshot)
+            XCTAssertEqual(record.equipmentNumberSnapshot, originalRecord.equipmentNumberSnapshot)
+            XCTAssertEqual(record.createdAt, originalRecord.createdAt)
+            XCTAssertGreaterThan(record.updatedAt, originalRecord.updatedAt)
+            XCTAssertEqual(record.syncStatus, .pending)
+            XCTAssertNil(record.photoData)
+            XCTAssertEqual(record.status, originalRecord.status)
+            XCTAssertEqual(record.memo, originalRecord.memo)
+            return true
+        }
     }
 
     func testInspectionEditingCancelRestoresOriginalSnapshot() async {
@@ -484,8 +561,12 @@ final class InspectionFeatureTests: XCTestCase {
             load: {
                 InspectionRepository.Snapshot(targets: [], records: [])
             },
+            loadPendingRecords: {
+                []
+            },
             saveTarget: saveTarget,
-            saveRecord: saveRecord
+            saveRecord: saveRecord,
+            updateSyncStatus: { _, _ in }
         )
     }
 
@@ -507,12 +588,14 @@ final class InspectionFeatureTests: XCTestCase {
         InspectionRecord(
             id: UUID(),
             targetID: target.id,
-            targetName: target.name,
-            equipmentNumber: target.equipmentNumber,
+            targetNameSnapshot: target.name,
+            equipmentNumberSnapshot: target.equipmentNumber,
             createdAt: createdAt,
+            updatedAt: createdAt,
             photoData: photoData,
             status: status,
-            memo: memo
+            memo: memo,
+            syncStatus: .pending
         )
     }
 }

@@ -140,8 +140,8 @@ struct InspectionEditorFeature {
         init(record: InspectionRecord) {
             self.target = InspectionTarget(
                 id: record.targetID,
-                name: record.targetName,
-                equipmentNumber: record.equipmentNumber
+                name: record.targetNameSnapshot,
+                equipmentNumber: record.equipmentNumberSnapshot
             )
             self.recordID = record.id
             self.createdAt = record.createdAt
@@ -205,15 +205,18 @@ struct InspectionEditorFeature {
                 return .send(.delegate(.cancelled))
 
             case .saveButtonTapped:
+                let updatedAt = state.mode == .create ? state.createdAt : Date()
                 let record = InspectionRecord(
                     id: state.recordID ?? UUID(),
                     targetID: state.target.id,
-                    targetName: state.target.name,
-                    equipmentNumber: state.target.equipmentNumber,
+                    targetNameSnapshot: state.target.name,
+                    equipmentNumberSnapshot: state.target.equipmentNumber,
                     createdAt: state.createdAt,
+                    updatedAt: updatedAt,
                     photoData: state.photoData,
                     status: state.status,
-                    memo: state.memo
+                    memo: state.memo,
+                    syncStatus: .pending
                 )
 
                 return .send(.delegate(.saved(record)))

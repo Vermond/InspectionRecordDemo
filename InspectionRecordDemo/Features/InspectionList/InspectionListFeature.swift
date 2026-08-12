@@ -48,8 +48,8 @@ struct InspectionListFeature {
             }
 
             return records.filter { record in
-                record.targetName.localizedCaseInsensitiveContains(query)
-                    || record.equipmentNumber.localizedCaseInsensitiveContains(query)
+                record.targetNameSnapshot.localizedCaseInsensitiveContains(query)
+                    || record.equipmentNumberSnapshot.localizedCaseInsensitiveContains(query)
                     || record.memo.localizedCaseInsensitiveContains(query)
                     || (record.status?.title.localizedCaseInsensitiveContains(query) ?? false)
             }
@@ -403,7 +403,7 @@ struct InspectionListView: View {
                             store.send(.recordSelected(record.id))
                         } label: {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(record.targetName)
+                                Text(record.targetNameSnapshot)
                                     .font(.headline)
                                 Text(record.status?.title ?? "상태 미지정")
                                     .font(.subheadline)

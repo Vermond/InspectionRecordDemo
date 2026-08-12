@@ -17,6 +17,11 @@ enum InspectionStatus: String, CaseIterable, Equatable, Hashable, Sendable {
     }
 }
 
+enum SyncStatus: String, Equatable, Sendable {
+    case pending
+    case synced
+}
+
 struct InspectionTarget: Equatable, Identifiable, Sendable {
     let id: UUID
     var name: String
@@ -26,10 +31,36 @@ struct InspectionTarget: Equatable, Identifiable, Sendable {
 struct InspectionRecord: Equatable, Identifiable, Sendable {
     let id: UUID
     let targetID: UUID
-    let targetName: String
-    let equipmentNumber: String
+    let targetNameSnapshot: String
+    let equipmentNumberSnapshot: String
     let createdAt: Date
+    let updatedAt: Date
+    var syncStatus: SyncStatus
     var photoData: Data?
     var status: InspectionStatus?
     var memo: String
+
+    init(
+        id: UUID,
+        targetID: UUID,
+        targetNameSnapshot: String,
+        equipmentNumberSnapshot: String,
+        createdAt: Date,
+        updatedAt: Date,
+        photoData: Data?,
+        status: InspectionStatus?,
+        memo: String,
+        syncStatus: SyncStatus = .pending
+    ) {
+        self.id = id
+        self.targetID = targetID
+        self.targetNameSnapshot = targetNameSnapshot
+        self.equipmentNumberSnapshot = equipmentNumberSnapshot
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.syncStatus = syncStatus
+        self.photoData = photoData
+        self.status = status
+        self.memo = memo
+    }
 }

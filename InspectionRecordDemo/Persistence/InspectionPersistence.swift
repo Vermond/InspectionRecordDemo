@@ -7,6 +7,7 @@ enum InspectionPersistenceError: Error, Equatable, Sendable {
     case loadFailed
     case saveFailed
     case targetNotFound
+    case recordNotFound
 
     var userMessage: String {
         switch self {
@@ -18,6 +19,8 @@ enum InspectionPersistenceError: Error, Equatable, Sendable {
             "점검 데이터를 저장하지 못했습니다."
         case .targetNotFound:
             "점검 대상 정보를 찾을 수 없습니다."
+        case .recordNotFound:
+            "점검 기록 정보를 찾을 수 없습니다."
         }
     }
 }
@@ -29,8 +32,10 @@ struct InspectionRepository: Sendable {
     }
 
     var load: @Sendable () async throws -> Snapshot
+    var loadPendingRecords: @Sendable () async throws -> [InspectionRecord]
     var saveTarget: @Sendable (InspectionTarget) async throws -> Void
     var saveRecord: @Sendable (InspectionRecord) async throws -> Void
+    var updateSyncStatus: @Sendable (UUID, SyncStatus) async throws -> Void
 }
 
 @Model
@@ -53,9 +58,11 @@ final class InspectionTargetModel {
 final class InspectionRecordModel {
     @Attribute(.unique) var id: UUID
     var targetID: UUID
-    var targetName: String
-    var equipmentNumber: String
+    var targetNameSnapshot: String
+    var equipmentNumberSnapshot: String
     var createdAt: Date
+    var updatedAt: Date
+    var syncStatusRawValue: String
     @Attribute(.externalStorage) var photoData: Data?
     var statusRawValue: String?
     var memo: String
@@ -64,9 +71,11 @@ final class InspectionRecordModel {
     init(
         id: UUID,
         targetID: UUID,
-        targetName: String,
-        equipmentNumber: String,
+        targetNameSnapshot: String,
+        equipmentNumberSnapshot: String,
         createdAt: Date,
+        updatedAt: Date,
+        syncStatusRawValue: String,
         photoData: Data?,
         statusRawValue: String?,
         memo: String,
@@ -74,9 +83,11 @@ final class InspectionRecordModel {
     ) {
         self.id = id
         self.targetID = targetID
-        self.targetName = targetName
-        self.equipmentNumber = equipmentNumber
+        self.targetNameSnapshot = targetNameSnapshot
+        self.equipmentNumberSnapshot = equipmentNumberSnapshot
         self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.syncStatusRawValue = syncStatusRawValue
         self.photoData = photoData
         self.statusRawValue = statusRawValue
         self.memo = memo
@@ -99,6 +110,24 @@ actor InspectionDatabase {
                 .sorted { $0.createdAt > $1.createdAt }
 
             return InspectionRepository.Snapshot(targets: targets, records: records)
+        } catch {
+            throw InspectionPersistenceError.loadFailed
+        }
+    }
+
+    func loadPendingRecords() throws -> [InspectionRecord] {
+        let pendingRawValue = SyncStatus.pending.rawValue
+        let descriptor = FetchDescriptor<InspectionRecordModel>(
+            predicate: #Predicate<InspectionRecordModel> { model in
+                model.syncStatusRawValue == pendingRawValue
+            }
+        )
+
+        do {
+            return try modelContext
+                .fetch(descriptor)
+                .map(\.domainValue)
+                .sorted { $0.updatedAt > $1.updatedAt }
         } catch {
             throw InspectionPersistenceError.loadFailed
         }
@@ -161,9 +190,11 @@ actor InspectionDatabase {
                     InspectionRecordModel(
                         id: record.id,
                         targetID: record.targetID,
-                        targetName: record.targetName,
-                        equipmentNumber: record.equipmentNumber,
+                        targetNameSnapshot: record.targetNameSnapshot,
+                        equipmentNumberSnapshot: record.equipmentNumberSnapshot,
                         createdAt: record.createdAt,
+                        updatedAt: record.updatedAt,
+                        syncStatusRawValue: record.syncStatus.rawValue,
                         photoData: record.photoData,
                         statusRawValue: record.status?.rawValue,
                         memo: record.memo,
@@ -172,6 +203,26 @@ actor InspectionDatabase {
                 )
             }
 
+            try modelContext.save()
+        } catch let error as InspectionPersistenceError {
+            throw error
+        } catch {
+            throw InspectionPersistenceError.saveFailed
+        }
+    }
+
+    func updateSyncStatus(for recordID: UUID, to syncStatus: SyncStatus) throws {
+        do {
+            let descriptor = FetchDescriptor<InspectionRecordModel>(
+                predicate: #Predicate<InspectionRecordModel> { model in
+                    model.id == recordID
+                }
+            )
+            guard let record = try modelContext.fetch(descriptor).first else {
+                throw InspectionPersistenceError.recordNotFound
+            }
+
+            record.syncStatusRawValue = syncStatus.rawValue
             try modelContext.save()
         } catch let error as InspectionPersistenceError {
             throw error
@@ -201,20 +252,24 @@ private extension InspectionRecordModel {
         InspectionRecord(
             id: id,
             targetID: targetID,
-            targetName: targetName,
-            equipmentNumber: equipmentNumber,
+            targetNameSnapshot: targetNameSnapshot,
+            equipmentNumberSnapshot: equipmentNumberSnapshot,
             createdAt: createdAt,
+            updatedAt: updatedAt,
             photoData: photoData,
             status: statusRawValue.flatMap(InspectionStatus.init(rawValue:)),
-            memo: memo
+            memo: memo,
+            syncStatus: SyncStatus(rawValue: syncStatusRawValue) ?? .pending
         )
     }
 
     func update(from record: InspectionRecord, target: InspectionTargetModel) {
         targetID = record.targetID
-        targetName = record.targetName
-        equipmentNumber = record.equipmentNumber
+        targetNameSnapshot = record.targetNameSnapshot
+        equipmentNumberSnapshot = record.equipmentNumberSnapshot
         createdAt = record.createdAt
+        updatedAt = record.updatedAt
+        syncStatusRawValue = record.syncStatus.rawValue
         photoData = record.photoData
         statusRawValue = record.status?.rawValue
         memo = record.memo
@@ -235,11 +290,17 @@ extension InspectionRepository: DependencyKey {
                 load: {
                     try await database.load()
                 },
+                loadPendingRecords: {
+                    try await database.loadPendingRecords()
+                },
                 saveTarget: { target in
                     try await database.saveTarget(target)
                 },
                 saveRecord: { record in
                     try await database.saveRecord(record)
+                },
+                updateSyncStatus: { recordID, syncStatus in
+                    try await database.updateSyncStatus(for: recordID, to: syncStatus)
                 }
             )
         } catch {
@@ -247,10 +308,16 @@ extension InspectionRepository: DependencyKey {
                 load: {
                     throw InspectionPersistenceError.storageUnavailable
                 },
+                loadPendingRecords: {
+                    throw InspectionPersistenceError.storageUnavailable
+                },
                 saveTarget: { _ in
                     throw InspectionPersistenceError.storageUnavailable
                 },
                 saveRecord: { _ in
+                    throw InspectionPersistenceError.storageUnavailable
+                },
+                updateSyncStatus: { _, _ in
                     throw InspectionPersistenceError.storageUnavailable
                 }
             )
@@ -261,8 +328,12 @@ extension InspectionRepository: DependencyKey {
         load: {
             Snapshot(targets: [], records: [])
         },
+        loadPendingRecords: {
+            []
+        },
         saveTarget: { _ in },
-        saveRecord: { _ in }
+        saveRecord: { _ in },
+        updateSyncStatus: { _, _ in }
     )
 }
 

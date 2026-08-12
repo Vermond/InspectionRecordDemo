@@ -16,12 +16,14 @@ final class InspectionPersistenceTests: XCTestCase {
         let record = InspectionRecord(
             id: UUID(),
             targetID: target.id,
-            targetName: target.name,
-            equipmentNumber: target.equipmentNumber,
+            targetNameSnapshot: target.name,
+            equipmentNumberSnapshot: target.equipmentNumber,
             createdAt: Date(timeIntervalSince1970: 1_000_000),
+            updatedAt: Date(timeIntervalSince1970: 1_000_060),
             photoData: Data([1, 2, 3]),
             status: .caution,
-            memo: "필터 확인 필요"
+            memo: "필터 확인 필요",
+            syncStatus: .synced
         )
 
         try await database.saveTarget(target)
@@ -46,22 +48,26 @@ final class InspectionPersistenceTests: XCTestCase {
         let originalRecord = InspectionRecord(
             id: recordID,
             targetID: target.id,
-            targetName: target.name,
-            equipmentNumber: target.equipmentNumber,
+            targetNameSnapshot: target.name,
+            equipmentNumberSnapshot: target.equipmentNumber,
             createdAt: Date(timeIntervalSince1970: 2_000_000),
+            updatedAt: Date(timeIntervalSince1970: 2_000_000),
             photoData: nil,
             status: .normal,
-            memo: "이상 없음"
+            memo: "이상 없음",
+            syncStatus: .synced
         )
         let updatedRecord = InspectionRecord(
             id: recordID,
             targetID: target.id,
-            targetName: target.name,
-            equipmentNumber: target.equipmentNumber,
-            createdAt: Date(timeIntervalSince1970: 2_000_060),
+            targetNameSnapshot: target.name,
+            equipmentNumberSnapshot: target.equipmentNumber,
+            createdAt: Date(timeIntervalSince1970: 2_000_000),
+            updatedAt: Date(timeIntervalSince1970: 2_000_120),
             photoData: Data([4, 5, 6]),
             status: .abnormal,
-            memo: "누유 확인"
+            memo: "누유 확인",
+            syncStatus: .pending
         )
 
         try await database.saveTarget(target)
@@ -73,14 +79,113 @@ final class InspectionPersistenceTests: XCTestCase {
         XCTAssertEqual(snapshot.records, [updatedRecord])
     }
 
+    func testUpdatingTargetDoesNotChangeRecordSnapshot() async throws {
+        let container = try makeInMemoryContainer()
+        let database = InspectionDatabase(modelContainer: container)
+        let target = InspectionTarget(
+            id: UUID(),
+            name: "기존 설비",
+            equipmentNumber: "EQ-003"
+        )
+        let record = InspectionRecord(
+            id: UUID(),
+            targetID: target.id,
+            targetNameSnapshot: target.name,
+            equipmentNumberSnapshot: target.equipmentNumber,
+            createdAt: Date(timeIntervalSince1970: 2_500_000),
+            updatedAt: Date(timeIntervalSince1970: 2_500_000),
+            photoData: nil,
+            status: .normal,
+            memo: "기록 당시 정보"
+        )
+        let updatedTarget = InspectionTarget(
+            id: target.id,
+            name: "변경된 설비",
+            equipmentNumber: "EQ-004"
+        )
+
+        try await database.saveTarget(target)
+        try await database.saveRecord(record)
+        try await database.saveTarget(updatedTarget)
+
+        let snapshot = try await database.load()
+
+        XCTAssertEqual(snapshot.records.first?.targetNameSnapshot, target.name)
+        XCTAssertEqual(snapshot.records.first?.equipmentNumberSnapshot, target.equipmentNumber)
+    }
+
+    func testLoadPendingRecordsReturnsOnlyPendingRecordsSortedByUpdatedAt() async throws {
+        let container = try makeInMemoryContainer()
+        let database = InspectionDatabase(modelContainer: container)
+        let target = InspectionTarget(
+            id: UUID(),
+            name: "펌프",
+            equipmentNumber: "EQ-005"
+        )
+        let olderPendingRecord = makeRecord(
+            target: target,
+            id: UUID(),
+            updatedAt: Date(timeIntervalSince1970: 4_000_000),
+            syncStatus: .pending
+        )
+        let newerPendingRecord = makeRecord(
+            target: target,
+            id: UUID(),
+            updatedAt: Date(timeIntervalSince1970: 4_000_120),
+            syncStatus: .pending
+        )
+        let syncedRecord = makeRecord(
+            target: target,
+            id: UUID(),
+            updatedAt: Date(timeIntervalSince1970: 4_000_240),
+            syncStatus: .synced
+        )
+
+        try await database.saveTarget(target)
+        try await database.saveRecord(olderPendingRecord)
+        try await database.saveRecord(newerPendingRecord)
+        try await database.saveRecord(syncedRecord)
+
+        let pendingRecords = try await database.loadPendingRecords()
+
+        XCTAssertEqual(pendingRecords, [newerPendingRecord, olderPendingRecord])
+    }
+
+    func testUpdateSyncStatusPersistsStatusChange() async throws {
+        let container = try makeInMemoryContainer()
+        let database = InspectionDatabase(modelContainer: container)
+        let target = InspectionTarget(
+            id: UUID(),
+            name: "송풍기",
+            equipmentNumber: "EQ-006"
+        )
+        let record = makeRecord(
+            target: target,
+            id: UUID(),
+            updatedAt: Date(timeIntervalSince1970: 5_000_000),
+            syncStatus: .pending
+        )
+
+        try await database.saveTarget(target)
+        try await database.saveRecord(record)
+        try await database.updateSyncStatus(for: record.id, to: .synced)
+
+        let snapshot = try await database.load()
+        let pendingRecords = try await database.loadPendingRecords()
+
+        XCTAssertEqual(snapshot.records.first?.syncStatus, .synced)
+        XCTAssertEqual(pendingRecords, [])
+    }
+
     func testSaveRecordFailsWhenTargetDoesNotExist() async throws {
         let database = InspectionDatabase(modelContainer: try makeInMemoryContainer())
         let record = InspectionRecord(
             id: UUID(),
             targetID: UUID(),
-            targetName: "없는 대상",
-            equipmentNumber: "EQ-404",
+            targetNameSnapshot: "없는 대상",
+            equipmentNumberSnapshot: "EQ-404",
             createdAt: Date(timeIntervalSince1970: 3_000_000),
+            updatedAt: Date(timeIntervalSince1970: 3_000_000),
             photoData: nil,
             status: nil,
             memo: ""
@@ -107,6 +212,26 @@ final class InspectionPersistenceTests: XCTestCase {
             for: InspectionTargetModel.self,
             InspectionRecordModel.self,
             configurations: configuration
+        )
+    }
+
+    private func makeRecord(
+        target: InspectionTarget,
+        id: UUID,
+        updatedAt: Date,
+        syncStatus: SyncStatus
+    ) -> InspectionRecord {
+        InspectionRecord(
+            id: id,
+            targetID: target.id,
+            targetNameSnapshot: target.name,
+            equipmentNumberSnapshot: target.equipmentNumber,
+            createdAt: updatedAt,
+            updatedAt: updatedAt,
+            photoData: nil,
+            status: .normal,
+            memo: "",
+            syncStatus: syncStatus
         )
     }
 }
