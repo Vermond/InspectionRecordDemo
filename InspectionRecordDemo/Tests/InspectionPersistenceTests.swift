@@ -11,7 +11,8 @@ final class InspectionPersistenceTests: XCTestCase {
         let target = InspectionTarget(
             id: UUID(),
             name: "냉각 설비",
-            equipmentNumber: "EQ-001"
+            equipmentNumber: "EQ-001",
+            syncStatus: .synced
         )
         let record = InspectionRecord(
             id: UUID(),
@@ -35,6 +36,7 @@ final class InspectionPersistenceTests: XCTestCase {
         let snapshot = try await reloadedDatabase.load()
 
         XCTAssertEqual(snapshot.targets, [target])
+        XCTAssertEqual(snapshot.targets.first?.syncStatus, .synced)
         XCTAssertEqual(snapshot.records, [record])
         XCTAssertEqual(snapshot.records.first?.latitude, 37.5665)
         XCTAssertEqual(snapshot.records.first?.longitude, 126.9780)

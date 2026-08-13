@@ -18,6 +18,19 @@ struct SupabaseInspectionTarget: Decodable, Equatable, Sendable {
     }
 }
 
+extension SupabaseInspectionTarget {
+    var domainValue: InspectionTarget {
+        InspectionTarget(
+            id: id,
+            name: name,
+            equipmentNumber: equipmentNumber,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            syncStatus: .synced
+        )
+    }
+}
+
 private struct SupabaseInspectionTargetInsertPayload: Encodable, Sendable {
     let id: UUID
     let name: String

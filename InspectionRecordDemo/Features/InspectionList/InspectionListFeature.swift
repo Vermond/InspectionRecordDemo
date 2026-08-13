@@ -4,6 +4,7 @@ import Foundation
 @Reducer
 struct InspectionListFeature {
     @Dependency(\.inspectionRepository) private var inspectionRepository
+    @Dependency(\.inspectionTargetsClient) private var inspectionTargetsClient
     @Dependency(\.locationPreferences) private var locationPreferences
 
     @ObservableState
@@ -68,6 +69,8 @@ struct InspectionListFeature {
         case binding(BindingAction<State>)
         case task
         case persistenceLoaded(Result<InspectionRepository.Snapshot, InspectionPersistenceError>)
+        case serverTargetsLoaded([InspectionTarget])
+        case serverTargetsLoadFailed
         case targetPersisted(InspectionTarget)
         case recordPersisted(InspectionRecord)
         case persistenceFailed(InspectionPersistenceError)
@@ -122,12 +125,42 @@ struct InspectionListFeature {
                 state.isLoading = false
                 state.hasLoadedPersistence = true
                 state.persistenceErrorMessage = nil
-                return .none
+                return fetchServerTargets()
 
             case let .persistenceLoaded(.failure(error)):
                 state.isLoading = false
                 state.hasLoadedPersistence = true
                 state.persistenceErrorMessage = error.userMessage
+                return fetchServerTargets()
+
+            case let .serverTargetsLoaded(serverTargets):
+                let localTargets = state.targets
+                let localTargetsByID = Dictionary(
+                    uniqueKeysWithValues: localTargets.map { ($0.id, $0) }
+                )
+                let mergedTargets = Self.mergeTargets(
+                    localTargets: localTargets,
+                    serverTargets: serverTargets
+                )
+                let targetsToPersist = serverTargets.compactMap { serverTarget in
+                    guard let localTarget = localTargetsByID[serverTarget.id] else {
+                        return serverTarget
+                    }
+
+                    guard localTarget.syncStatus == .synced,
+                          serverTarget.updatedAt > localTarget.updatedAt
+                    else {
+                        return nil
+                    }
+
+                    return serverTarget
+                }
+
+                state.targets = mergedTargets
+                return persistServerTargets(targetsToPersist)
+
+            case .serverTargetsLoadFailed:
+                state.persistenceErrorMessage = "점검 대상 목록을 서버에서 불러오지 못했습니다."
                 return .none
 
             case let .destination(.presented(.targetForm(.delegate(.saved(target))))):
@@ -262,6 +295,65 @@ struct InspectionListFeature {
                 await send(.persistenceFailed(.saveFailed))
             }
         }
+    }
+
+    private func fetchServerTargets() -> EffectOf<Self> {
+        let client = self.inspectionTargetsClient
+
+        return .run { send in
+            do {
+                let targets = try await client.fetch().map(\.domainValue)
+                await send(.serverTargetsLoaded(targets))
+            } catch {
+                await send(.serverTargetsLoadFailed)
+            }
+        }
+    }
+
+    private func persistServerTargets(_ targets: [InspectionTarget]) -> EffectOf<Self> {
+        guard !targets.isEmpty else {
+            return .none
+        }
+
+        let repository = self.inspectionRepository
+
+        return .run { send in
+            do {
+                for target in targets {
+                    try await repository.saveTarget(target)
+                }
+            } catch let error as InspectionPersistenceError {
+                await send(.persistenceFailed(error))
+            } catch {
+                await send(.persistenceFailed(.saveFailed))
+            }
+        }
+    }
+
+    private static func mergeTargets(
+        localTargets: [InspectionTarget],
+        serverTargets: [InspectionTarget]
+    ) -> [InspectionTarget] {
+        var mergedTargets = Dictionary(
+            uniqueKeysWithValues: localTargets.map { ($0.id, $0) }
+        )
+
+        for serverTarget in serverTargets {
+            guard let localTarget = mergedTargets[serverTarget.id] else {
+                mergedTargets[serverTarget.id] = serverTarget
+                continue
+            }
+
+            guard localTarget.syncStatus == .synced,
+                  serverTarget.updatedAt > localTarget.updatedAt
+            else {
+                continue
+            }
+
+            mergedTargets[serverTarget.id] = serverTarget
+        }
+
+        return mergedTargets.values.sorted { $0.name < $1.name }
     }
 }
 

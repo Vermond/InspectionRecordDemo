@@ -45,6 +45,7 @@ final class InspectionTargetModel {
     var equipmentNumber: String
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
+    var syncStatusRawValue: String = SyncStatus.pending.rawValue
 
     @Relationship(deleteRule: .nullify, inverse: \InspectionRecordModel.target)
     var records: [InspectionRecordModel] = []
@@ -54,13 +55,15 @@ final class InspectionTargetModel {
         name: String,
         equipmentNumber: String,
         createdAt: Date,
-        updatedAt: Date
+        updatedAt: Date,
+        syncStatus: SyncStatus
     ) {
         self.id = id
         self.name = name
         self.equipmentNumber = equipmentNumber
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.syncStatusRawValue = syncStatus.rawValue
     }
 }
 
@@ -168,7 +171,8 @@ actor InspectionDatabase {
                         name: target.name,
                         equipmentNumber: target.equipmentNumber,
                         createdAt: target.createdAt,
-                        updatedAt: target.updatedAt
+                        updatedAt: target.updatedAt,
+                        syncStatus: target.syncStatus
                     )
                 )
             }
@@ -259,7 +263,8 @@ private extension InspectionTargetModel {
             name: name,
             equipmentNumber: equipmentNumber,
             createdAt: createdAt,
-            updatedAt: updatedAt
+            updatedAt: updatedAt,
+            syncStatus: SyncStatus(rawValue: syncStatusRawValue) ?? .pending
         )
     }
 
@@ -267,6 +272,7 @@ private extension InspectionTargetModel {
         name = target.name
         equipmentNumber = target.equipmentNumber
         updatedAt = target.updatedAt
+        syncStatusRawValue = target.syncStatus.rawValue
     }
 }
 

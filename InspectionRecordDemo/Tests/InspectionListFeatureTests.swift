@@ -26,6 +26,7 @@ final class InspectionListFeatureTests: XCTestCase {
                 saveRecord: { _ in },
                 updateSyncStatus: { _, _ in }
             )
+            $0.inspectionTargetsClient = .testValue
         }
 
         await store.send(.task) {
@@ -37,6 +38,116 @@ final class InspectionListFeatureTests: XCTestCase {
             $0.isLoading = false
             $0.hasLoadedPersistence = true
         }
+        await store.receive(\.serverTargetsLoaded)
+    }
+
+    func testServerTargetDoesNotReplacePendingLocalTarget() async {
+        let targetID = UUID()
+        let localTarget = makeTarget(
+            id: targetID,
+            name: "로컬 대상",
+            updatedAt: Date(timeIntervalSince1970: 1_000),
+            syncStatus: .pending
+        )
+        let serverTarget = SupabaseInspectionTarget(
+            id: targetID,
+            name: "서버 대상",
+            equipmentNumber: "SERVER-001",
+            createdAt: localTarget.createdAt,
+            updatedAt: Date(timeIntervalSince1970: 2_000)
+        )
+        var initialState = InspectionListFeature.State()
+        initialState.targets = [localTarget]
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        }
+
+        await store.send(.serverTargetsLoaded([serverTarget.domainValue]))
+    }
+
+    func testTaskLoadsServerTargetsIntoList() async {
+        let serverTarget = SupabaseInspectionTarget(
+            id: UUID(),
+            name: "서버 설비",
+            equipmentNumber: "SERVER-001",
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            updatedAt: Date(timeIntervalSince1970: 1_000)
+        )
+        let expectedTarget = serverTarget.domainValue
+        let store = TestStore(initialState: InspectionListFeature.State()) {
+            InspectionListFeature()
+        } withDependencies: {
+            $0.inspectionRepository = makeRepository()
+            $0.inspectionTargetsClient = InspectionTargetsClient(
+                fetch: { [serverTarget] },
+                insert: { $0 },
+                update: { $0 }
+            )
+        }
+
+        await store.send(.task) {
+            $0.isLoading = true
+        }
+        await store.receive(\.persistenceLoaded.success) {
+            $0.isLoading = false
+            $0.hasLoadedPersistence = true
+        }
+        await store.receive(\.serverTargetsLoaded) {
+            $0.targets = [expectedTarget]
+        }
+    }
+
+    func testNewerServerTargetReplacesOlderSyncedLocalTarget() async {
+        let targetID = UUID()
+        let localTarget = makeTarget(
+            id: targetID,
+            name: "기존 대상",
+            updatedAt: Date(timeIntervalSince1970: 1_000),
+            syncStatus: .synced
+        )
+        let serverTarget = SupabaseInspectionTarget(
+            id: targetID,
+            name: "최신 대상",
+            equipmentNumber: "SERVER-001",
+            createdAt: localTarget.createdAt,
+            updatedAt: Date(timeIntervalSince1970: 2_000)
+        )
+        let expectedTarget = serverTarget.domainValue
+        var initialState = InspectionListFeature.State()
+        initialState.targets = [localTarget]
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        } withDependencies: {
+            $0.inspectionRepository = makeRepository()
+        }
+
+        await store.send(.serverTargetsLoaded([serverTarget.domainValue])) {
+            $0.targets = [expectedTarget]
+        }
+    }
+
+    func testOlderServerTargetDoesNotReplaceNewerSyncedLocalTarget() async {
+        let targetID = UUID()
+        let localTarget = makeTarget(
+            id: targetID,
+            name: "최신 로컬 대상",
+            updatedAt: Date(timeIntervalSince1970: 2_000),
+            syncStatus: .synced
+        )
+        let serverTarget = SupabaseInspectionTarget(
+            id: targetID,
+            name: "오래된 서버 대상",
+            equipmentNumber: "SERVER-001",
+            createdAt: localTarget.createdAt,
+            updatedAt: Date(timeIntervalSince1970: 1_000)
+        )
+        var initialState = InspectionListFeature.State()
+        initialState.targets = [localTarget]
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        }
+
+        await store.send(.serverTargetsLoaded([serverTarget.domainValue]))
     }
 
     func testTargetDetailButtonPresentsTargetDetailWithLatestInspectionDate() async {
@@ -345,11 +456,21 @@ final class InspectionListFeatureTests: XCTestCase {
         )
     }
 
-    private func makeTarget() -> InspectionTarget {
+    private func makeTarget(
+        id: UUID = UUID(),
+        name: String = "냉각 설비",
+        equipmentNumber: String = "EQ-001",
+        createdAt: Date = Date(),
+        updatedAt: Date? = nil,
+        syncStatus: SyncStatus = .pending
+    ) -> InspectionTarget {
         InspectionTarget(
-            id: UUID(),
-            name: "냉각 설비",
-            equipmentNumber: "EQ-001"
+            id: id,
+            name: name,
+            equipmentNumber: equipmentNumber,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            syncStatus: syncStatus
         )
     }
 

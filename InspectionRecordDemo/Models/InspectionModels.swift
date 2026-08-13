@@ -28,19 +28,22 @@ struct InspectionTarget: Equatable, Identifiable, Sendable {
     var equipmentNumber: String
     let createdAt: Date
     var updatedAt: Date
+    var syncStatus: SyncStatus
 
     init(
         id: UUID,
         name: String,
         equipmentNumber: String,
         createdAt: Date = Date(),
-        updatedAt: Date? = nil
+        updatedAt: Date? = nil,
+        syncStatus: SyncStatus = .pending
     ) {
         self.id = id
         self.name = name
         self.equipmentNumber = equipmentNumber
         self.createdAt = createdAt
         self.updatedAt = updatedAt ?? createdAt
+        self.syncStatus = syncStatus
     }
 }
 
