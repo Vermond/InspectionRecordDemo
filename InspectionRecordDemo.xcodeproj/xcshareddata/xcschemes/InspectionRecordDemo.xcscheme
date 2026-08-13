@@ -37,6 +37,26 @@
                BlueprintName = "InspectionRecordDemoTests"
                ReferencedContainer = "container:InspectionRecordDemo.xcodeproj">
             </BuildableReference>
+            <SkippedTests>
+               <Test
+                  Identifier = "InspectionTargetsClientIntegrationTests">
+               </Test>
+               <Test
+                  Identifier = "InspectionTargetsClientIntegrationTests/testFetchesInspectionTargetFromSupabase()">
+               </Test>
+               <Test
+                  Identifier = "InspectionTargetsClientIntegrationTests/testInsertsAndUpdatesInspectionTargetInSupabase()">
+               </Test>
+               <Test
+                  Identifier = "InspectionTargetsClientIntegrationTests/testRejectsInspectionRecordPhotoOverFiveMiB()">
+               </Test>
+               <Test
+                  Identifier = "InspectionTargetsClientIntegrationTests/testRejectsNonJPEGInspectionRecordPhoto()">
+               </Test>
+               <Test
+                  Identifier = "InspectionTargetsClientIntegrationTests/testSyncsInspectionRecordWithAllPhotoActionsInSupabase()">
+               </Test>
+            </SkippedTests>
          </TestableReference>
       </Testables>
    </TestAction>

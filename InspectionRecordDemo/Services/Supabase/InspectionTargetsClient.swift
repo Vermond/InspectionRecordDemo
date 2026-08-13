@@ -109,14 +109,6 @@ extension InspectionTargetsClient: DependencyKey {
     )
 }
 
-private func makeSupabaseClient() throws -> SupabaseClient {
-    let configuration = try SupabaseConfiguration.load()
-    return SupabaseClient(
-        supabaseURL: configuration.url,
-        supabaseKey: configuration.publishableKey
-    )
-}
-
 extension DependencyValues {
     var inspectionTargetsClient: InspectionTargetsClient {
         get { self[InspectionTargetsClient.self] }

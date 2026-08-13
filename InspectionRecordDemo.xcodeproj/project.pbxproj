@@ -37,6 +37,8 @@
 		A00000000000000000000066 /* TargetDetailFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000068 /* TargetDetailFeature.swift */; };
 		A00000000000000000000067 /* TargetDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000069 /* TargetDetailView.swift */; };
 		A0000000000000000000006A /* InspectionTargetsClientIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000006B /* InspectionTargetsClientIntegrationTests.swift */; };
+		A0000000000000000000006C /* SupabaseClientFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000006E /* SupabaseClientFactory.swift */; };
+		A0000000000000000000006D /* InspectionRecordsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000006F /* InspectionRecordsClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -86,6 +88,8 @@
 		A00000000000000000000068 /* TargetDetailFeature.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TargetDetailFeature.swift; sourceTree = "<group>"; };
 		A00000000000000000000069 /* TargetDetailView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TargetDetailView.swift; sourceTree = "<group>"; };
 		A0000000000000000000006B /* InspectionTargetsClientIntegrationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionTargetsClientIntegrationTests.swift; sourceTree = "<group>"; };
+		A0000000000000000000006E /* SupabaseClientFactory.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseClientFactory.swift; sourceTree = "<group>"; };
+		A0000000000000000000006F /* InspectionRecordsClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionRecordsClient.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -242,7 +246,9 @@
 			isa = PBXGroup;
 			children = (
 				A0000000000000000000005D /* SupabaseConfiguration.swift */,
+				A0000000000000000000006E /* SupabaseClientFactory.swift */,
 				A0000000000000000000005E /* InspectionTargetsClient.swift */,
+				A0000000000000000000006F /* InspectionRecordsClient.swift */,
 			);
 			path = Supabase;
 			sourceTree = "<group>";
@@ -363,7 +369,9 @@
 				A0000000000000000000000E /* InspectionRecordDemoApp.swift in Sources */,
 				A0000000000000000000000F /* AppFeature.swift in Sources */,
 				A0000000000000000000005A /* SupabaseConfiguration.swift in Sources */,
+				A0000000000000000000006C /* SupabaseClientFactory.swift in Sources */,
 				A0000000000000000000005B /* InspectionTargetsClient.swift in Sources */,
+				A0000000000000000000006D /* InspectionRecordsClient.swift in Sources */,
 				A00000000000000000000020 /* InspectionModels.swift in Sources */,
 				A00000000000000000000021 /* InspectionListFeature.swift in Sources */,
 				A00000000000000000000022 /* InspectionEditorFeature.swift in Sources */,

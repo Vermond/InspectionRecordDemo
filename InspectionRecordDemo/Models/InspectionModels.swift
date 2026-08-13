@@ -50,7 +50,7 @@ struct InspectionRecord: Equatable, Identifiable, Sendable {
     let targetNameSnapshot: String
     let equipmentNumberSnapshot: String
     let createdAt: Date
-    let updatedAt: Date
+    var updatedAt: Date
     let latitude: Double?
     let longitude: Double?
     var syncStatus: SyncStatus
