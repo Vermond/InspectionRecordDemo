@@ -86,10 +86,14 @@ final class InspectionPersistenceTests: XCTestCase {
     func testUpdatingTargetDoesNotChangeRecordSnapshot() async throws {
         let container = try makeInMemoryContainer()
         let database = InspectionDatabase(modelContainer: container)
+        let createdAt = Date(timeIntervalSince1970: 3_000_000)
+        let updatedAt = Date(timeIntervalSince1970: 3_000_120)
         let target = InspectionTarget(
             id: UUID(),
             name: "기존 설비",
-            equipmentNumber: "EQ-003"
+            equipmentNumber: "EQ-003",
+            createdAt: createdAt,
+            updatedAt: createdAt
         )
         let record = InspectionRecord(
             id: UUID(),
@@ -105,7 +109,9 @@ final class InspectionPersistenceTests: XCTestCase {
         let updatedTarget = InspectionTarget(
             id: target.id,
             name: "변경된 설비",
-            equipmentNumber: "EQ-004"
+            equipmentNumber: "EQ-004",
+            createdAt: Date(timeIntervalSince1970: 9_000_000),
+            updatedAt: updatedAt
         )
 
         try await database.saveTarget(target)
@@ -116,6 +122,8 @@ final class InspectionPersistenceTests: XCTestCase {
 
         XCTAssertEqual(snapshot.records.first?.targetNameSnapshot, target.name)
         XCTAssertEqual(snapshot.records.first?.equipmentNumberSnapshot, target.equipmentNumber)
+        XCTAssertEqual(snapshot.targets.first?.createdAt, target.createdAt)
+        XCTAssertEqual(snapshot.targets.first?.updatedAt, updatedTarget.updatedAt)
     }
 
     func testLoadPendingRecordsReturnsOnlyPendingRecordsSortedByUpdatedAt() async throws {

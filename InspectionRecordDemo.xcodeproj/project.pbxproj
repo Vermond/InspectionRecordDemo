@@ -13,9 +13,14 @@
 		A00000000000000000000020 /* InspectionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001D /* InspectionModels.swift */; };
 		A00000000000000000000021 /* InspectionListFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001E /* InspectionListFeature.swift */; };
 		A00000000000000000000022 /* InspectionEditorFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001F /* InspectionEditorFeature.swift */; };
+		A00000000000000000000023 /* InspectionPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000024 /* InspectionPersistence.swift */; };
+		A00000000000000000000026 /* InspectionPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000029 /* InspectionPersistenceTests.swift */; };
+		A00000000000000000000035 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000036 /* XCTest.framework */; };
 		A00000000000000000000037 /* InspectionEditorLocationClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003A /* InspectionEditorLocationClient.swift */; };
 		A00000000000000000000038 /* InspectionEditorCameraClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003B /* InspectionEditorCameraClient.swift */; };
 		A00000000000000000000039 /* InspectionEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003C /* InspectionEditorView.swift */; };
+		A00000000000000000000040 /* InspectionListFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003D /* InspectionListFeatureTests.swift */; };
+		A00000000000000000000041 /* InspectionEditorFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003E /* InspectionEditorFeatureTests.swift */; };
 		A00000000000000000000042 /* LocationPreferencesClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000050 /* LocationPreferencesClient.swift */; };
 		A00000000000000000000043 /* TargetFormFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000051 /* TargetFormFeature.swift */; };
 		A00000000000000000000044 /* TargetFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000052 /* TargetFormView.swift */; };
@@ -26,11 +31,11 @@
 		A00000000000000000000049 /* SystemCameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000057 /* SystemCameraView.swift */; };
 		A0000000000000000000004A /* InspectionPhotoDataNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000058 /* InspectionPhotoDataNormalizer.swift */; };
 		A0000000000000000000004B /* InspectionEditorGeocodingClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000059 /* InspectionEditorGeocodingClient.swift */; };
-		A00000000000000000000023 /* InspectionPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000024 /* InspectionPersistence.swift */; };
-		A00000000000000000000026 /* InspectionPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000029 /* InspectionPersistenceTests.swift */; };
-		A00000000000000000000040 /* InspectionListFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003D /* InspectionListFeatureTests.swift */; };
-		A00000000000000000000041 /* InspectionEditorFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003E /* InspectionEditorFeatureTests.swift */; };
-		A00000000000000000000035 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000036 /* XCTest.framework */; };
+		A0000000000000000000005A /* SupabaseConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000005D /* SupabaseConfiguration.swift */; };
+		A0000000000000000000005B /* InspectionTargetsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000005E /* InspectionTargetsClient.swift */; };
+		A0000000000000000000005C /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000065 /* Supabase */; };
+		A00000000000000000000066 /* TargetDetailFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000068 /* TargetDetailFeature.swift */; };
+		A00000000000000000000067 /* TargetDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000069 /* TargetDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -44,6 +49,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		7D19127B302D6C080065A942 /* Supabase.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Supabase.xcconfig; sourceTree = "<group>"; };
 		7DF77CD6302BFF1F00F953B9 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
 		7DF77CD7302BFF1F00F953B9 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		7DF77CD8302BFF1F00F953B9 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
@@ -53,9 +59,15 @@
 		A0000000000000000000001D /* InspectionModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionModels.swift; sourceTree = "<group>"; };
 		A0000000000000000000001E /* InspectionListFeature.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionListFeature.swift; sourceTree = "<group>"; };
 		A0000000000000000000001F /* InspectionEditorFeature.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionEditorFeature.swift; sourceTree = "<group>"; };
+		A00000000000000000000024 /* InspectionPersistence.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionPersistence.swift; sourceTree = "<group>"; };
+		A00000000000000000000029 /* InspectionPersistenceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionPersistenceTests.swift; sourceTree = "<group>"; };
+		A0000000000000000000002B /* InspectionRecordDemoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = InspectionRecordDemoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000000000000000000036 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		A0000000000000000000003A /* InspectionEditorLocationClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionEditorLocationClient.swift; sourceTree = "<group>"; };
 		A0000000000000000000003B /* InspectionEditorCameraClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionEditorCameraClient.swift; sourceTree = "<group>"; };
 		A0000000000000000000003C /* InspectionEditorView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionEditorView.swift; sourceTree = "<group>"; };
+		A0000000000000000000003D /* InspectionListFeatureTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionListFeatureTests.swift; sourceTree = "<group>"; };
+		A0000000000000000000003E /* InspectionEditorFeatureTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionEditorFeatureTests.swift; sourceTree = "<group>"; };
 		A00000000000000000000050 /* LocationPreferencesClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LocationPreferencesClient.swift; sourceTree = "<group>"; };
 		A00000000000000000000051 /* TargetFormFeature.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TargetFormFeature.swift; sourceTree = "<group>"; };
 		A00000000000000000000052 /* TargetFormView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TargetFormView.swift; sourceTree = "<group>"; };
@@ -66,12 +78,12 @@
 		A00000000000000000000057 /* SystemCameraView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SystemCameraView.swift; sourceTree = "<group>"; };
 		A00000000000000000000058 /* InspectionPhotoDataNormalizer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionPhotoDataNormalizer.swift; sourceTree = "<group>"; };
 		A00000000000000000000059 /* InspectionEditorGeocodingClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionEditorGeocodingClient.swift; sourceTree = "<group>"; };
-		A00000000000000000000024 /* InspectionPersistence.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionPersistence.swift; sourceTree = "<group>"; };
-		A00000000000000000000029 /* InspectionPersistenceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionPersistenceTests.swift; sourceTree = "<group>"; };
-		A0000000000000000000003D /* InspectionListFeatureTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionListFeatureTests.swift; sourceTree = "<group>"; };
-		A0000000000000000000003E /* InspectionEditorFeatureTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionEditorFeatureTests.swift; sourceTree = "<group>"; };
-		A0000000000000000000002B /* InspectionRecordDemoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = InspectionRecordDemoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A00000000000000000000036 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
+		A0000000000000000000005D /* SupabaseConfiguration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SupabaseConfiguration.swift; sourceTree = "<group>"; };
+		A0000000000000000000005E /* InspectionTargetsClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InspectionTargetsClient.swift; sourceTree = "<group>"; };
+		A0000000000000000000005F /* Supabase.xcconfig.example */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Supabase.xcconfig.example; sourceTree = "<group>"; };
+		A00000000000000000000060 /* Supabase.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Supabase.xcconfig; sourceTree = "<group>"; };
+		A00000000000000000000068 /* TargetDetailFeature.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TargetDetailFeature.swift; sourceTree = "<group>"; };
+		A00000000000000000000069 /* TargetDetailView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TargetDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,6 +92,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A00000000000000000000010 /* ComposableArchitecture in Frameworks */,
+				A0000000000000000000005C /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -108,6 +121,7 @@
 				7DF77CD6302BFF1F00F953B9 /* AGENTS.md */,
 				7DF77CD7302BFF1F00F953B9 /* LICENSE */,
 				7DF77CD8302BFF1F00F953B9 /* README.md */,
+				A00000000000000000000063 /* Config */,
 				A0000000000000000000001C /* InspectionRecordDemo */,
 				A00000000000000000000004 /* Products */,
 				7DF77CDC302C143400F953B9 /* Recovered References */,
@@ -148,6 +162,8 @@
 				A00000000000000000000050 /* LocationPreferencesClient.swift */,
 				A00000000000000000000051 /* TargetFormFeature.swift */,
 				A00000000000000000000052 /* TargetFormView.swift */,
+				A00000000000000000000068 /* TargetDetailFeature.swift */,
+				A00000000000000000000069 /* TargetDetailView.swift */,
 				A00000000000000000000053 /* InspectionListView.swift */,
 				A00000000000000000000054 /* InspectionTargetsView.swift */,
 				A00000000000000000000055 /* InspectionHistoryView.swift */,
@@ -195,6 +211,7 @@
 				A00000000000000000000006 /* Features */,
 				A00000000000000000000009 /* Models */,
 				A00000000000000000000025 /* Persistence */,
+				A00000000000000000000061 /* Services */,
 				A0000000000000000000000A /* Tests */,
 			);
 			path = InspectionRecordDemo;
@@ -206,6 +223,33 @@
 				A00000000000000000000024 /* InspectionPersistence.swift */,
 			);
 			path = Persistence;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000061 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000062 /* Supabase */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000062 /* Supabase */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000005D /* SupabaseConfiguration.swift */,
+				A0000000000000000000005E /* InspectionTargetsClient.swift */,
+			);
+			path = Supabase;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000063 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000005F /* Supabase.xcconfig.example */,
+				7D19127B302D6C080065A942 /* Supabase.xcconfig */,
+				A00000000000000000000060 /* Supabase.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -226,6 +270,7 @@
 			name = InspectionRecordDemo;
 			packageProductDependencies = (
 				A0000000000000000000001B /* ComposableArchitecture */,
+				A00000000000000000000065 /* Supabase */,
 			);
 			productName = InspectionRecordDemo;
 			productReference = A0000000000000000000000D /* InspectionRecordDemo.app */;
@@ -278,6 +323,7 @@
 			mainGroup = A00000000000000000000003;
 			packageReferences = (
 				A0000000000000000000001A /* XCRemoteSwiftPackageReference "swift-composable-architecture" */,
+				A00000000000000000000064 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			productRefGroup = A00000000000000000000004 /* Products */;
 			projectDirPath = "";
@@ -313,6 +359,8 @@
 			files = (
 				A0000000000000000000000E /* InspectionRecordDemoApp.swift in Sources */,
 				A0000000000000000000000F /* AppFeature.swift in Sources */,
+				A0000000000000000000005A /* SupabaseConfiguration.swift in Sources */,
+				A0000000000000000000005B /* InspectionTargetsClient.swift in Sources */,
 				A00000000000000000000020 /* InspectionModels.swift in Sources */,
 				A00000000000000000000021 /* InspectionListFeature.swift in Sources */,
 				A00000000000000000000022 /* InspectionEditorFeature.swift in Sources */,
@@ -322,6 +370,8 @@
 				A00000000000000000000042 /* LocationPreferencesClient.swift in Sources */,
 				A00000000000000000000043 /* TargetFormFeature.swift in Sources */,
 				A00000000000000000000044 /* TargetFormView.swift in Sources */,
+				A00000000000000000000066 /* TargetDetailFeature.swift in Sources */,
+				A00000000000000000000067 /* TargetDetailView.swift in Sources */,
 				A00000000000000000000045 /* InspectionListView.swift in Sources */,
 				A00000000000000000000046 /* InspectionTargetsView.swift in Sources */,
 				A00000000000000000000047 /* InspectionHistoryView.swift in Sources */,
@@ -437,6 +487,7 @@
 		};
 		A00000000000000000000018 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A00000000000000000000060 /* Supabase.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
@@ -444,6 +495,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "점검 사진 촬영을 위해 카메라 접근 권한이 필요합니다.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "점검 당시 위치를 기록하기 위해 위치 접근 권한이 필요합니다.";
+				INFOPLIST_KEY_SUPABASE_PUBLISHABLE_KEY = "$(SUPABASE_PUBLISHABLE_KEY)";
+				INFOPLIST_KEY_SUPABASE_URL = "$(SUPABASE_URL)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -465,6 +518,7 @@
 		};
 		A00000000000000000000019 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A00000000000000000000060 /* Supabase.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
@@ -472,6 +526,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "점검 사진 촬영을 위해 카메라 접근 권한이 필요합니다.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "점검 당시 위치를 기록하기 위해 위치 접근 권한이 필요합니다.";
+				INFOPLIST_KEY_SUPABASE_PUBLISHABLE_KEY = "$(SUPABASE_PUBLISHABLE_KEY)";
+				INFOPLIST_KEY_SUPABASE_URL = "$(SUPABASE_URL)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -580,6 +636,14 @@
 				version = 1.26.1;
 			};
 		};
+		A00000000000000000000064 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -587,6 +651,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A0000000000000000000001A /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
 			productName = ComposableArchitecture;
+		};
+		A00000000000000000000065 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A00000000000000000000064 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

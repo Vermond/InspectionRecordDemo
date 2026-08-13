@@ -43,14 +43,24 @@ final class InspectionTargetModel {
     @Attribute(.unique) var id: UUID
     var name: String
     var equipmentNumber: String
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
 
     @Relationship(deleteRule: .nullify, inverse: \InspectionRecordModel.target)
     var records: [InspectionRecordModel] = []
 
-    init(id: UUID, name: String, equipmentNumber: String) {
+    init(
+        id: UUID,
+        name: String,
+        equipmentNumber: String,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
         self.id = id
         self.name = name
         self.equipmentNumber = equipmentNumber
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 }
 
@@ -156,7 +166,9 @@ actor InspectionDatabase {
                     InspectionTargetModel(
                         id: target.id,
                         name: target.name,
-                        equipmentNumber: target.equipmentNumber
+                        equipmentNumber: target.equipmentNumber,
+                        createdAt: target.createdAt,
+                        updatedAt: target.updatedAt
                     )
                 )
             }
@@ -245,13 +257,16 @@ private extension InspectionTargetModel {
         InspectionTarget(
             id: id,
             name: name,
-            equipmentNumber: equipmentNumber
+            equipmentNumber: equipmentNumber,
+            createdAt: createdAt,
+            updatedAt: updatedAt
         )
     }
 
     func update(from target: InspectionTarget) {
         name = target.name
         equipmentNumber = target.equipmentNumber
+        updatedAt = target.updatedAt
     }
 }
 

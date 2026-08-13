@@ -10,7 +10,7 @@ struct TargetFormView: View {
                 TextField("점검 대상 이름", text: $store.name)
                 TextField("장비 번호", text: $store.equipmentNumber)
             }
-            .navigationTitle("점검 대상 추가")
+            .navigationTitle(store.mode.navigationTitle)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("취소") {

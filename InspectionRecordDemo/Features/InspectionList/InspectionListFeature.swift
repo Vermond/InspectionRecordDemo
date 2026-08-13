@@ -77,6 +77,7 @@ struct InspectionListFeature {
         case locationPermissionWarningSettingsButtonTapped
         case addTargetButtonTapped
         case targetSelected(InspectionTarget.ID)
+        case targetDetailButtonTapped(InspectionTarget.ID)
         case recordSelected(InspectionRecord.ID)
         case destination(PresentationAction<Destination.Action>)
     }
@@ -84,6 +85,7 @@ struct InspectionListFeature {
     @Reducer
     enum Destination {
         case targetForm(TargetFormFeature)
+        case targetDetail(TargetDetailFeature)
         case inspection(InspectionEditorFeature)
     }
 
@@ -129,25 +131,25 @@ struct InspectionListFeature {
                 return .none
 
             case let .destination(.presented(.targetForm(.delegate(.saved(target))))):
-                let repository = self.inspectionRepository
+                return saveTarget(target)
 
-                return .run { send in
-                    do {
-                        try await repository.saveTarget(target)
-                        await send(.targetPersisted(target))
-                    } catch let error as InspectionPersistenceError {
-                        await send(.persistenceFailed(error))
-                    } catch {
-                        await send(.persistenceFailed(.saveFailed))
-                    }
-                }
+            case let .destination(.presented(.targetDetail(.delegate(.targetSaveRequested(target))))):
+                return saveTarget(target)
 
             case let .targetPersisted(target):
-                if !state.targets.contains(where: { $0.id == target.id }) {
+                if let index = state.targets.firstIndex(where: { $0.id == target.id }) {
+                    state.targets[index] = target
+                } else {
                     state.targets.append(target)
                 }
 
-                state.destination = nil
+                if case let .some(.targetDetail(detailState)) = state.destination {
+                    var detailState = detailState
+                    detailState.target = target
+                    state.destination = .targetDetail(detailState)
+                } else {
+                    state.destination = nil
+                }
                 return .none
 
             case let .destination(.presented(.inspection(.delegate(.saved(record))))):
@@ -207,6 +209,19 @@ struct InspectionListFeature {
                 state.destination = .inspection(InspectionEditorFeature.State(target: target))
                 return .none
 
+            case let .targetDetailButtonTapped(targetID):
+                guard let target = state.targets.first(where: { $0.id == targetID }) else {
+                    return .none
+                }
+
+                state.destination = .targetDetail(
+                    TargetDetailFeature.State(
+                        target: target,
+                        latestInspectionAt: state.latestRecordsByTargetID[targetID]?.createdAt
+                    )
+                )
+                return .none
+
             case let .recordSelected(recordID):
                 guard let record = state.records.first(where: { $0.id == recordID }) else {
                     return .none
@@ -219,6 +234,10 @@ struct InspectionListFeature {
                 state.destination = nil
                 return .none
 
+            case .destination(.presented(.targetDetail(.delegate(.cancelled)))):
+                state.destination = nil
+                return .none
+
             case .destination(.presented(.inspection(.delegate(.cancelled)))):
                 state.destination = nil
                 return .none
@@ -228,6 +247,21 @@ struct InspectionListFeature {
             }
         }
         .ifLet(\.$destination, action: \.destination)
+    }
+
+    private func saveTarget(_ target: InspectionTarget) -> EffectOf<Self> {
+        let repository = self.inspectionRepository
+
+        return .run { send in
+            do {
+                try await repository.saveTarget(target)
+                await send(.targetPersisted(target))
+            } catch let error as InspectionPersistenceError {
+                await send(.persistenceFailed(error))
+            } catch {
+                await send(.persistenceFailed(.saveFailed))
+            }
+        }
     }
 }
 

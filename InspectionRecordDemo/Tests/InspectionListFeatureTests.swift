@@ -39,6 +39,31 @@ final class InspectionListFeatureTests: XCTestCase {
         }
     }
 
+    func testTargetDetailButtonPresentsTargetDetailWithLatestInspectionDate() async {
+        let target = makeTarget()
+        let latestRecord = makeRecord(
+            for: target,
+            createdAt: Date(timeIntervalSince1970: 2_000)
+        )
+        var initialState = InspectionListFeature.State()
+        initialState.targets = [target]
+        initialState.records = [latestRecord]
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        } withDependencies: {
+            $0.inspectionRepository = makeRepository()
+        }
+
+        await store.send(.targetDetailButtonTapped(target.id)) {
+            $0.destination = .targetDetail(
+                TargetDetailFeature.State(
+                    target: target,
+                    latestInspectionAt: latestRecord.createdAt
+                )
+            )
+        }
+    }
+
     func testSavingTargetUpdatesStateAfterPersistenceSucceeds() async {
         let target = makeTarget()
         var initialState = InspectionListFeature.State()
@@ -79,6 +104,50 @@ final class InspectionListFeatureTests: XCTestCase {
             $0.persistenceErrorMessage = InspectionPersistenceError.saveFailed.userMessage
         }
         XCTAssertNotNil(store.state.destination)
+    }
+
+    func testSavingTargetFromDetailUpdatesTargetWithoutChangingRecordSnapshots() async {
+        let target = makeTarget()
+        let record = makeRecord(for: target)
+        var updatedTarget = target
+        updatedTarget.name = "변경된 설비"
+        updatedTarget.equipmentNumber = "EQ-002"
+        updatedTarget.updatedAt = Date(timeIntervalSince1970: 2_000)
+
+        var initialState = InspectionListFeature.State()
+        initialState.targets = [target]
+        initialState.records = [record]
+        initialState.destination = .targetDetail(
+            TargetDetailFeature.State(
+                target: target,
+                latestInspectionAt: record.createdAt
+            )
+        )
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        } withDependencies: {
+            $0.inspectionRepository = makeRepository()
+        }
+
+        await store.send(
+            .destination(
+                .presented(
+                    .targetDetail(
+                        .delegate(.targetSaveRequested(updatedTarget))
+                    )
+                )
+            )
+        )
+        await store.receive(\.targetPersisted) {
+            $0.targets = [updatedTarget]
+            $0.records = [record]
+            $0.destination = .targetDetail(
+                TargetDetailFeature.State(
+                    target: updatedTarget,
+                    latestInspectionAt: record.createdAt
+                )
+            )
+        }
     }
 
     func testSavingInspectionRecordInsertsRecordAfterPersistenceSucceeds() async {

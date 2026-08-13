@@ -26,6 +26,22 @@ struct InspectionTarget: Equatable, Identifiable, Sendable {
     let id: UUID
     var name: String
     var equipmentNumber: String
+    let createdAt: Date
+    var updatedAt: Date
+
+    init(
+        id: UUID,
+        name: String,
+        equipmentNumber: String,
+        createdAt: Date = Date(),
+        updatedAt: Date? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.equipmentNumber = equipmentNumber
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt ?? createdAt
+    }
 }
 
 struct InspectionRecord: Equatable, Identifiable, Sendable {

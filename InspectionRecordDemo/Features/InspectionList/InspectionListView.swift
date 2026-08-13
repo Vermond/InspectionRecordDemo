@@ -35,6 +35,14 @@ struct InspectionListView: View {
         }
         .sheet(
             item: $store.scope(
+                state: \.destination?.targetDetail,
+                action: \.destination.targetDetail
+            )
+        ) { targetDetailStore in
+            TargetDetailView(store: targetDetailStore)
+        }
+        .sheet(
+            item: $store.scope(
                 state: \.destination?.inspection,
                 action: \.destination.inspection
             )

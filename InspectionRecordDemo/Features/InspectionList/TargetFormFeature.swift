@@ -5,8 +5,31 @@ import Foundation
 struct TargetFormFeature {
     @ObservableState
     struct State: Equatable {
+        enum Mode: Equatable {
+            case create
+            case edit(id: UUID, createdAt: Date)
+
+            var navigationTitle: String {
+                switch self {
+                case .create:
+                    "점검 대상 추가"
+                case .edit:
+                    "점검 대상 수정"
+                }
+            }
+        }
+
+        var mode: Mode = .create
         var name = ""
         var equipmentNumber = ""
+
+        init() {}
+
+        init(target: InspectionTarget) {
+            self.mode = .edit(id: target.id, createdAt: target.createdAt)
+            self.name = target.name
+            self.equipmentNumber = target.equipmentNumber
+        }
 
         var canSave: Bool {
             !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -39,11 +62,30 @@ struct TargetFormFeature {
                     return .none
                 }
 
-                let target = InspectionTarget(
-                    id: UUID(),
-                    name: state.name.trimmingCharacters(in: .whitespacesAndNewlines),
-                    equipmentNumber: state.equipmentNumber.trimmingCharacters(in: .whitespacesAndNewlines)
-                )
+                let timestamp = Date()
+                let name = state.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                let equipmentNumber = state.equipmentNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+                let target: InspectionTarget
+
+                switch state.mode {
+                case .create:
+                    target = InspectionTarget(
+                        id: UUID(),
+                        name: name,
+                        equipmentNumber: equipmentNumber,
+                        createdAt: timestamp,
+                        updatedAt: timestamp
+                    )
+
+                case let .edit(id, createdAt):
+                    target = InspectionTarget(
+                        id: id,
+                        name: name,
+                        equipmentNumber: equipmentNumber,
+                        createdAt: createdAt,
+                        updatedAt: timestamp
+                    )
+                }
 
                 return .send(.delegate(.saved(target)))
 
