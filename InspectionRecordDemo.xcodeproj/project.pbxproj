@@ -55,6 +55,7 @@
 		7D19127C302D82D20065A942 /* InspectionRecordDemoTests-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "InspectionRecordDemoTests-Info.plist"; sourceTree = "<group>"; };
 		7D19127D302D86840065A942 /* Supabase.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Supabase.xcconfig; sourceTree = "<group>"; };
 		7D19127E302D8B170065A942 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		7D191280302DA6360065A942 /* WARNING.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = WARNING.md; sourceTree = "<group>"; };
 		7DF77CD6302BFF1F00F953B9 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
 		7DF77CD7302BFF1F00F953B9 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		7DF77CD8302BFF1F00F953B9 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
@@ -113,6 +114,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		7D19127F302DA6260065A942 /* MD */ = {
+			isa = PBXGroup;
+			children = (
+				7D191280302DA6360065A942 /* WARNING.md */,
+			);
+			path = MD;
+			sourceTree = "<group>";
+		};
 		7DF77CDC302C143400F953B9 /* Recovered References */ = {
 			isa = PBXGroup;
 			children = (
@@ -128,6 +137,7 @@
 				7DF77CD6302BFF1F00F953B9 /* AGENTS.md */,
 				7DF77CD7302BFF1F00F953B9 /* LICENSE */,
 				7DF77CD8302BFF1F00F953B9 /* README.md */,
+				7D19127F302DA6260065A942 /* MD */,
 				A00000000000000000000063 /* Config */,
 				A0000000000000000000001C /* InspectionRecordDemo */,
 				A00000000000000000000004 /* Products */,
