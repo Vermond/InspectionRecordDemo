@@ -35,7 +35,7 @@ final class InspectionTargetsClientIntegrationTests: XCTestCase {
         )
 
         let client = InspectionTargetsClient.liveValue
-        let inserted = try await client.insert(insertedTarget)
+        let inserted = try await client.upsert(insertedTarget)
 
         XCTAssertEqual(inserted.id, id)
         XCTAssertEqual(inserted.name, insertedName)
@@ -59,7 +59,7 @@ final class InspectionTargetsClientIntegrationTests: XCTestCase {
         updateTarget.equipmentNumber = updatedEquipmentNumber
         updateTarget.updatedAt = updatedAt
 
-        let updated = try await client.update(updateTarget)
+        let updated = try await client.upsert(updateTarget)
 
         XCTAssertEqual(updated.id, id)
         XCTAssertEqual(updated.name, updatedName)

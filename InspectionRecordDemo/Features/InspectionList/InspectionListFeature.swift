@@ -72,6 +72,8 @@ struct InspectionListFeature {
         case serverTargetsLoaded([InspectionTarget])
         case serverTargetsLoadFailed
         case targetPersisted(InspectionTarget)
+        case targetSynced(InspectionTarget)
+        case targetSyncFailed
         case recordPersisted(InspectionRecord)
         case persistenceFailed(InspectionPersistenceError)
         case persistenceErrorDismissed
@@ -170,19 +172,22 @@ struct InspectionListFeature {
                 return saveTarget(target)
 
             case let .targetPersisted(target):
-                if let index = state.targets.firstIndex(where: { $0.id == target.id }) {
-                    state.targets[index] = target
-                } else {
-                    state.targets.append(target)
-                }
+                Self.replaceTarget(target, in: &state)
 
-                if case let .some(.targetDetail(detailState)) = state.destination {
-                    var detailState = detailState
-                    detailState.target = target
-                    state.destination = .targetDetail(detailState)
+                if case .some(.targetDetail(_)) = state.destination {
+                    return .none
                 } else {
                     state.destination = nil
                 }
+                return .none
+
+            case let .targetSynced(target):
+                Self.replaceTarget(target, in: &state)
+                state.persistenceErrorMessage = nil
+                return .none
+
+            case .targetSyncFailed:
+                state.persistenceErrorMessage = "점검 대상은 로컬에 저장되었지만 서버 동기화에 실패했습니다."
                 return .none
 
             case let .destination(.presented(.inspection(.delegate(.saved(record))))):
@@ -284,16 +289,55 @@ struct InspectionListFeature {
 
     private func saveTarget(_ target: InspectionTarget) -> EffectOf<Self> {
         let repository = self.inspectionRepository
+        let client = self.inspectionTargetsClient
+        let pendingTarget: InspectionTarget = {
+            var target = target
+            target.syncStatus = .pending
+            return target
+        }()
 
         return .run { send in
             do {
-                try await repository.saveTarget(target)
-                await send(.targetPersisted(target))
+                try await repository.saveTarget(pendingTarget)
             } catch let error as InspectionPersistenceError {
                 await send(.persistenceFailed(error))
+                return
             } catch {
                 await send(.persistenceFailed(.saveFailed))
+                return
             }
+
+            await send(.targetPersisted(pendingTarget))
+
+            do {
+                let response = try await client.upsert(
+                    SupabaseInspectionTarget(target: pendingTarget)
+                )
+                let syncedTarget = response.domainValue(
+                    preservingUpdatedAt: pendingTarget.updatedAt
+                )
+                try await repository.saveTarget(syncedTarget)
+                await send(.targetSynced(syncedTarget))
+            } catch {
+                await send(.targetSyncFailed)
+            }
+        }
+    }
+
+    private static func replaceTarget(
+        _ target: InspectionTarget,
+        in state: inout State
+    ) {
+        if let index = state.targets.firstIndex(where: { $0.id == target.id }) {
+            state.targets[index] = target
+        } else {
+            state.targets.append(target)
+        }
+
+        if case let .some(.targetDetail(detailState)) = state.destination {
+            var detailState = detailState
+            detailState.target = target
+            state.destination = .targetDetail(detailState)
         }
     }
 

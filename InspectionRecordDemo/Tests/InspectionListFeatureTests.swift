@@ -80,8 +80,7 @@ final class InspectionListFeatureTests: XCTestCase {
             $0.inspectionRepository = makeRepository()
             $0.inspectionTargetsClient = InspectionTargetsClient(
                 fetch: { [serverTarget] },
-                insert: { $0 },
-                update: { $0 }
+                upsert: { $0 }
             )
         }
 
@@ -192,6 +191,18 @@ final class InspectionListFeatureTests: XCTestCase {
             $0.targets = [target]
             $0.destination = nil
         }
+        await store.receive(\.targetSynced) {
+            $0.targets = [
+                InspectionTarget(
+                    id: target.id,
+                    name: target.name,
+                    equipmentNumber: target.equipmentNumber,
+                    createdAt: target.createdAt,
+                    updatedAt: target.updatedAt,
+                    syncStatus: .synced
+                )
+            ]
+        }
     }
 
     func testSavingTargetKeepsFormOpenWhenPersistenceFails() async {
@@ -215,6 +226,79 @@ final class InspectionListFeatureTests: XCTestCase {
             $0.persistenceErrorMessage = InspectionPersistenceError.saveFailed.userMessage
         }
         XCTAssertNotNil(store.state.destination)
+    }
+
+    func testSavingTargetKeepsPendingStateWhenServerUpsertFails() async {
+        let target = makeTarget()
+        var initialState = InspectionListFeature.State()
+        initialState.destination = .targetForm(TargetFormFeature.State())
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        } withDependencies: {
+            $0.inspectionRepository = makeRepository()
+            $0.inspectionTargetsClient = InspectionTargetsClient(
+                fetch: { [] },
+                upsert: { _ in
+                    throw InspectionPersistenceError.saveFailed
+                }
+            )
+        }
+
+        await store.send(
+            .destination(.presented(.targetForm(.delegate(.saved(target)))))
+        )
+        await store.receive(\.targetPersisted) {
+            $0.targets = [target]
+            $0.destination = nil
+        }
+        await store.receive(\.targetSyncFailed) {
+            $0.persistenceErrorMessage = "점검 대상은 로컬에 저장되었지만 서버 동기화에 실패했습니다."
+        }
+        XCTAssertEqual(store.state.targets.first?.syncStatus, .pending)
+    }
+
+    func testTargetSyncPreservesLocalUpdatedAt() async {
+        let localUpdatedAt = Date(timeIntervalSince1970: 1_000)
+        let serverUpdatedAt = Date(timeIntervalSince1970: 2_000)
+        let target = makeTarget(updatedAt: localUpdatedAt)
+        let serverTarget = SupabaseInspectionTarget(
+            id: target.id,
+            name: "서버 응답 대상",
+            equipmentNumber: "SERVER-001",
+            createdAt: target.createdAt,
+            updatedAt: serverUpdatedAt
+        )
+        var initialState = InspectionListFeature.State()
+        initialState.destination = .targetForm(TargetFormFeature.State())
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        } withDependencies: {
+            $0.inspectionRepository = makeRepository()
+            $0.inspectionTargetsClient = InspectionTargetsClient(
+                fetch: { [] },
+                upsert: { _ in serverTarget }
+            )
+        }
+
+        await store.send(
+            .destination(.presented(.targetForm(.delegate(.saved(target)))))
+        )
+        await store.receive(\.targetPersisted) {
+            $0.targets = [target]
+            $0.destination = nil
+        }
+        await store.receive(\.targetSynced) {
+            $0.targets = [
+                InspectionTarget(
+                    id: target.id,
+                    name: serverTarget.name,
+                    equipmentNumber: serverTarget.equipmentNumber,
+                    createdAt: serverTarget.createdAt,
+                    updatedAt: localUpdatedAt,
+                    syncStatus: .synced
+                )
+            ]
+        }
     }
 
     func testSavingTargetFromDetailUpdatesTargetWithoutChangingRecordSnapshots() async {
@@ -255,6 +339,18 @@ final class InspectionListFeatureTests: XCTestCase {
             $0.destination = .targetDetail(
                 TargetDetailFeature.State(
                     target: updatedTarget,
+                    latestInspectionAt: record.createdAt
+                )
+            )
+        }
+        await store.receive(\.targetSynced) {
+            var syncedTarget = updatedTarget
+            syncedTarget.syncStatus = .synced
+            $0.targets = [syncedTarget]
+            $0.records = [record]
+            $0.destination = .targetDetail(
+                TargetDetailFeature.State(
+                    target: syncedTarget,
                     latestInspectionAt: record.createdAt
                 )
             )

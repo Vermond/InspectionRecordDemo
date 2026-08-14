@@ -19,7 +19,28 @@ struct SupabaseInspectionTarget: Decodable, Equatable, Sendable {
 }
 
 extension SupabaseInspectionTarget {
+    init(target: InspectionTarget) {
+        self.init(
+            id: target.id,
+            name: target.name,
+            equipmentNumber: target.equipmentNumber,
+            createdAt: target.createdAt,
+            updatedAt: target.updatedAt
+        )
+    }
+
     var domainValue: InspectionTarget {
+        InspectionTarget(
+            id: id,
+            name: name,
+            equipmentNumber: equipmentNumber,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            syncStatus: .synced
+        )
+    }
+
+    func domainValue(preservingUpdatedAt updatedAt: Date) -> InspectionTarget {
         InspectionTarget(
             id: id,
             name: name,
@@ -31,7 +52,7 @@ extension SupabaseInspectionTarget {
     }
 }
 
-private struct SupabaseInspectionTargetInsertPayload: Encodable, Sendable {
+private struct SupabaseInspectionTargetUpsertPayload: Encodable, Sendable {
     let id: UUID
     let name: String
     let equipmentNumber: String
@@ -55,28 +76,9 @@ private struct SupabaseInspectionTargetInsertPayload: Encodable, Sendable {
     }
 }
 
-private struct SupabaseInspectionTargetUpdatePayload: Encodable, Sendable {
-    let name: String
-    let equipmentNumber: String
-    let updatedAt: Date
-
-    init(target: SupabaseInspectionTarget) {
-        self.name = target.name
-        self.equipmentNumber = target.equipmentNumber
-        self.updatedAt = target.updatedAt
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case name
-        case equipmentNumber = "equipment_number"
-        case updatedAt = "updated_at"
-    }
-}
-
 struct InspectionTargetsClient: Sendable {
     var fetch: @Sendable () async throws -> [SupabaseInspectionTarget]
-    var insert: @Sendable (_ target: SupabaseInspectionTarget) async throws -> SupabaseInspectionTarget
-    var update: @Sendable (_ target: SupabaseInspectionTarget) async throws -> SupabaseInspectionTarget
+    var upsert: @Sendable (_ target: SupabaseInspectionTarget) async throws -> SupabaseInspectionTarget
 }
 
 extension InspectionTargetsClient: DependencyKey {
@@ -90,24 +92,15 @@ extension InspectionTargetsClient: DependencyKey {
                 .execute()
                 .value
         },
-        insert: { target in
+        upsert: { target in
             let client = try makeSupabaseClient()
 
             return try await client
                 .from("inspection_targets")
-                .insert(SupabaseInspectionTargetInsertPayload(target: target))
-                .select("id, name, equipment_number, created_at, updated_at")
-                .single()
-                .execute()
-                .value
-        },
-        update: { target in
-            let client = try makeSupabaseClient()
-
-            return try await client
-                .from("inspection_targets")
-                .update(SupabaseInspectionTargetUpdatePayload(target: target))
-                .eq("id", value: target.id.uuidString)
+                .upsert(
+                    SupabaseInspectionTargetUpsertPayload(target: target),
+                    onConflict: "id"
+                )
                 .select("id, name, equipment_number, created_at, updated_at")
                 .single()
                 .execute()
@@ -117,8 +110,7 @@ extension InspectionTargetsClient: DependencyKey {
 
     static let testValue = Self(
         fetch: { [] },
-        insert: { $0 },
-        update: { $0 }
+        upsert: { $0 }
     )
 }
 
