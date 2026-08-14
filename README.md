@@ -2,7 +2,7 @@
 
 시설/장비 점검 기록을 위한 iOS 데모 앱입니다.
 
-![InspectionRecordDemo](./resource/inspection_record_demo.gif)
+![InspectionRecordDemo](./RESOURCE/inspection_record_demo.gif)
 
 ## 주요 기능
 
