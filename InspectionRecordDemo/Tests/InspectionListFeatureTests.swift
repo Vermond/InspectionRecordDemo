@@ -7,6 +7,10 @@ private final class TestLocationPreference: @unchecked Sendable {
     var isSuppressed = false
 }
 
+private final class TestRecordSync: @unchecked Sendable {
+    var photoAction: InspectionRecordPhotoAction?
+}
+
 @MainActor
 final class InspectionListFeatureTests: XCTestCase {
     func testTaskLoadsPersistedSnapshot() async {
@@ -544,6 +548,11 @@ final class InspectionListFeatureTests: XCTestCase {
             $0.destination = nil
             $0.isLocationPermissionWarningPresented = true
         }
+        await store.receive(\.recordSynced) {
+            var syncedRecord = record
+            syncedRecord.syncStatus = .synced
+            $0.records = [syncedRecord]
+        }
     }
 
     func testSavingInspectionRecordWithExistingIDReplacesRecord() async {
@@ -578,6 +587,161 @@ final class InspectionListFeatureTests: XCTestCase {
             $0.destination = nil
             $0.isLocationPermissionWarningPresented = true
         }
+        await store.receive(\.recordSynced) {
+            var syncedRecord = updatedRecord
+            syncedRecord.syncStatus = .synced
+            $0.records = [syncedRecord]
+        }
+    }
+
+    func testSavingInspectionRecordSyncsAfterLocalPersistence() async {
+        let target = makeTarget()
+        let localUpdatedAt = Date(timeIntervalSince1970: 1_000_100)
+        let record = InspectionRecord(
+            id: UUID(),
+            targetID: target.id,
+            targetNameSnapshot: target.name,
+            equipmentNumberSnapshot: target.equipmentNumber,
+            createdAt: Date(timeIntervalSince1970: 1_000_000),
+            updatedAt: localUpdatedAt,
+            photoData: Data([1, 2, 3]),
+            status: .normal,
+            memo: "로컬 점검",
+            syncStatus: .pending
+        )
+        let serverRecord = InspectionRecord(
+            id: record.id,
+            targetID: record.targetID,
+            targetNameSnapshot: record.targetNameSnapshot,
+            equipmentNumberSnapshot: record.equipmentNumberSnapshot,
+            createdAt: record.createdAt,
+            updatedAt: Date(timeIntervalSince1970: 2_000_000),
+            photoData: record.photoData,
+            status: .caution,
+            memo: "서버 반영 점검",
+            syncStatus: .synced,
+            latitude: record.latitude,
+            longitude: record.longitude
+        )
+        let sync = TestRecordSync()
+        var initialState = InspectionListFeature.State()
+        initialState.targets = [target]
+        initialState.destination = .inspection(
+            InspectionEditorFeature.State(target: target)
+        )
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        } withDependencies: {
+            $0.inspectionRepository = makeRepository()
+            $0.inspectionRecordsClient = InspectionRecordsClient(
+                fetch: { [] },
+                sync: { _, photoAction in
+                    sync.photoAction = photoAction
+                    return serverRecord
+                }
+            )
+        }
+
+        await store.send(
+            .destination(.presented(.inspection(.delegate(.saved(record)))))
+        )
+        await store.receive(\.recordPersisted) {
+            $0.records = [record]
+            $0.destination = nil
+            $0.isLocationPermissionWarningPresented = true
+        }
+        await store.receive(\.recordSynced) {
+            var syncedRecord = serverRecord
+            syncedRecord.updatedAt = localUpdatedAt
+            syncedRecord.syncStatus = .synced
+            $0.records = [syncedRecord]
+        }
+
+        XCTAssertEqual(sync.photoAction, .upload)
+    }
+
+    func testSavingInspectionRecordKeepsPendingStateWhenSyncFails() async {
+        let target = makeTarget()
+        let record = makeRecord(for: target)
+        var initialState = InspectionListFeature.State()
+        initialState.targets = [target]
+        initialState.destination = .inspection(
+            InspectionEditorFeature.State(target: target)
+        )
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        } withDependencies: {
+            $0.inspectionRepository = makeRepository()
+            $0.inspectionRecordsClient = InspectionRecordsClient(
+                fetch: { [] },
+                sync: { _, _ in
+                    throw InspectionRecordsClientError.invalidResponse
+                }
+            )
+        }
+
+        await store.send(
+            .destination(.presented(.inspection(.delegate(.saved(record)))))
+        )
+        await store.receive(\.recordPersisted) {
+            $0.records = [record]
+            $0.destination = nil
+            $0.isLocationPermissionWarningPresented = true
+        }
+        await store.receive(\.recordSyncFailed) {
+            $0.persistenceErrorMessage = "점검 이력은 로컬에 저장되었지만 서버 동기화에 실패했습니다."
+        }
+
+        XCTAssertEqual(store.state.records.first?.syncStatus, .pending)
+    }
+
+    func testDeletingExistingInspectionRecordPhotoRequestsDelete() async {
+        let target = makeTarget()
+        let originalRecord = makeRecord(
+            for: target,
+            photoData: Data([1, 2, 3])
+        )
+        var updatedRecord = originalRecord
+        updatedRecord.updatedAt = Date(timeIntervalSince1970: 1_000_100)
+        updatedRecord.photoData = nil
+        let sync = TestRecordSync()
+        var initialState = InspectionListFeature.State()
+        initialState.records = [originalRecord]
+        initialState.destination = .inspection(
+            InspectionEditorFeature.State(record: originalRecord)
+        )
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        } withDependencies: {
+            $0.inspectionRepository = makeRepository()
+            $0.inspectionRecordsClient = InspectionRecordsClient(
+                fetch: { [] },
+                sync: { record, photoAction in
+                    sync.photoAction = photoAction
+                    return record
+                }
+            )
+        }
+
+        await store.send(
+            .destination(
+                .presented(
+                    .inspection(.delegate(.saved(updatedRecord)))
+                )
+            )
+        )
+        await store.receive(\.recordPersisted) {
+            $0.records = [updatedRecord]
+            $0.destination = nil
+            $0.isLocationPermissionWarningPresented = true
+        }
+        await store.receive(\.recordSynced) {
+            var syncedRecord = updatedRecord
+            syncedRecord.syncStatus = .synced
+            $0.records = [syncedRecord]
+        }
+
+        XCTAssertEqual(sync.photoAction, .delete)
     }
 
     func testSavingRecordWithoutLocationShowsWarningWhenNotSuppressed() async {
@@ -604,6 +768,11 @@ final class InspectionListFeatureTests: XCTestCase {
             $0.destination = nil
             $0.isLocationPermissionWarningPresented = true
         }
+        await store.receive(\.recordSynced) {
+            var syncedRecord = record
+            syncedRecord.syncStatus = .synced
+            $0.records = [syncedRecord]
+        }
     }
 
     func testSavingRecordWithoutLocationHidesWarningWhenSuppressed() async {
@@ -629,6 +798,11 @@ final class InspectionListFeatureTests: XCTestCase {
             $0.records = [record]
             $0.destination = nil
             $0.isLocationPermissionWarningPresented = false
+        }
+        await store.receive(\.recordSynced) {
+            var syncedRecord = record
+            syncedRecord.syncStatus = .synced
+            $0.records = [syncedRecord]
         }
     }
 

@@ -78,6 +78,8 @@ struct InspectionListFeature {
         case targetSynced(InspectionTarget)
         case targetSyncFailed
         case recordPersisted(InspectionRecord)
+        case recordSynced(InspectionRecord)
+        case recordSyncFailed
         case persistenceFailed(InspectionPersistenceError)
         case persistenceErrorDismissed
         case locationPermissionWarningDismissed
@@ -227,30 +229,29 @@ struct InspectionListFeature {
                 return .none
 
             case let .destination(.presented(.inspection(.delegate(.saved(record))))):
-                let repository = self.inspectionRepository
-
-                return .run { send in
-                    do {
-                        try await repository.saveRecord(record)
-                        await send(.recordPersisted(record))
-                    } catch let error as InspectionPersistenceError {
-                        await send(.persistenceFailed(error))
-                    } catch {
-                        await send(.persistenceFailed(.saveFailed))
-                    }
-                }
+                let existingRecord = state.records.first { $0.id == record.id }
+                let photoAction = Self.photoAction(
+                    for: record,
+                    existingRecord: existingRecord
+                )
+                return saveRecord(record, photoAction: photoAction)
 
             case let .recordPersisted(record):
-                if let index = state.records.firstIndex(where: { $0.id == record.id }) {
-                    state.records[index] = record
-                } else {
-                    state.records.insert(record, at: 0)
-                }
+                Self.replaceRecord(record, in: &state)
 
                 state.destination = nil
                 let hasCompleteLocation = record.latitude != nil && record.longitude != nil
                 state.isLocationPermissionWarningPresented = !hasCompleteLocation
                     && !self.locationPreferences.suppressLocationPermissionWarning()
+                return .none
+
+            case let .recordSynced(record):
+                Self.replaceRecord(record, in: &state)
+                state.persistenceErrorMessage = nil
+                return .none
+
+            case .recordSyncFailed:
+                state.persistenceErrorMessage = "점검 이력은 로컬에 저장되었지만 서버 동기화에 실패했습니다."
                 return .none
 
             case let .persistenceFailed(error):
@@ -360,6 +361,48 @@ struct InspectionListFeature {
         }
     }
 
+    private func saveRecord(
+        _ record: InspectionRecord,
+        photoAction: InspectionRecordPhotoAction
+    ) -> EffectOf<Self> {
+        let repository = self.inspectionRepository
+        let client = self.inspectionRecordsClient
+        let pendingRecord: InspectionRecord = {
+            var record = record
+            record.syncStatus = .pending
+            return record
+        }()
+
+        return .run { send in
+            do {
+                try await repository.saveRecord(pendingRecord)
+            } catch let error as InspectionPersistenceError {
+                await send(.persistenceFailed(error))
+                return
+            } catch {
+                await send(.persistenceFailed(.saveFailed))
+                return
+            }
+
+            await send(.recordPersisted(pendingRecord))
+
+            do {
+                let response = try await client.sync(
+                    pendingRecord,
+                    photoAction
+                )
+                let syncedRecord = Self.syncedRecord(
+                    response,
+                    preservingUpdatedAt: pendingRecord.updatedAt
+                )
+                try await repository.saveRecord(syncedRecord)
+                await send(.recordSynced(syncedRecord))
+            } catch {
+                await send(.recordSyncFailed)
+            }
+        }
+    }
+
     private static func replaceTarget(
         _ target: InspectionTarget,
         in state: inout State
@@ -375,6 +418,43 @@ struct InspectionListFeature {
             detailState.target = target
             state.destination = .targetDetail(detailState)
         }
+    }
+
+    private static func replaceRecord(
+        _ record: InspectionRecord,
+        in state: inout State
+    ) {
+        if let index = state.records.firstIndex(where: { $0.id == record.id }) {
+            state.records[index] = record
+        } else {
+            state.records.insert(record, at: 0)
+        }
+    }
+
+    private static func photoAction(
+        for record: InspectionRecord,
+        existingRecord: InspectionRecord?
+    ) -> InspectionRecordPhotoAction {
+        switch (existingRecord?.photoData, record.photoData) {
+        case (nil, nil):
+            return .keep
+        case (nil, .some):
+            return .upload
+        case (.some, nil):
+            return .delete
+        case let (.some(existingPhotoData), .some(photoData)):
+            return existingPhotoData == photoData ? .keep : .upload
+        }
+    }
+
+    private static func syncedRecord(
+        _ record: InspectionRecord,
+        preservingUpdatedAt updatedAt: Date
+    ) -> InspectionRecord {
+        var syncedRecord = record
+        syncedRecord.updatedAt = updatedAt
+        syncedRecord.syncStatus = .synced
+        return syncedRecord
     }
 
     private func fetchServerTargets() -> EffectOf<Self> {
