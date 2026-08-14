@@ -56,6 +56,12 @@
 		7D19127D302D86840065A942 /* Supabase.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Supabase.xcconfig; sourceTree = "<group>"; };
 		7D19127E302D8B170065A942 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7D191280302DA6360065A942 /* WARNING.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = WARNING.md; sourceTree = "<group>"; };
+		7DB0F58A302E9E23005452E3 /* IMPLEMENTATION.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = IMPLEMENTATION.md; sourceTree = "<group>"; };
+		7DB0F58B302EA125005452E3 /* ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ARCHITECTURE.md; sourceTree = "<group>"; };
+		7DB0F58C302EA131005452E3 /* SYNC_DESIGN.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SYNC_DESIGN.md; sourceTree = "<group>"; };
+		7DB0F58E302EA8AC005452E3 /* SETUP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SETUP.md; sourceTree = "<group>"; };
+		7DB0F58F302EA8BA005452E3 /* sync-inspection.ts */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.typescript; path = "sync-inspection.ts"; sourceTree = "<group>"; };
+		7DB0F592302EAE3F005452E3 /* inspection_record_demo.gif */ = {isa = PBXFileReference; lastKnownFileType = image.gif; path = inspection_record_demo.gif; sourceTree = "<group>"; };
 		7DF77CD6302BFF1F00F953B9 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
 		7DF77CD7302BFF1F00F953B9 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		7DF77CD8302BFF1F00F953B9 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
@@ -117,9 +123,37 @@
 		7D19127F302DA6260065A942 /* MD */ = {
 			isa = PBXGroup;
 			children = (
+				7DB0F58A302E9E23005452E3 /* IMPLEMENTATION.md */,
+				7DB0F58B302EA125005452E3 /* ARCHITECTURE.md */,
+				7DB0F58C302EA131005452E3 /* SYNC_DESIGN.md */,
 				7D191280302DA6360065A942 /* WARNING.md */,
 			);
 			path = MD;
+			sourceTree = "<group>";
+		};
+		7DB0F58D302EA8A2005452E3 /* SUPABASE */ = {
+			isa = PBXGroup;
+			children = (
+				7DB0F590302EAA30005452E3 /* functions */,
+				7DB0F58E302EA8AC005452E3 /* SETUP.md */,
+			);
+			path = SUPABASE;
+			sourceTree = "<group>";
+		};
+		7DB0F590302EAA30005452E3 /* functions */ = {
+			isa = PBXGroup;
+			children = (
+				7DB0F58F302EA8BA005452E3 /* sync-inspection.ts */,
+			);
+			path = functions;
+			sourceTree = "<group>";
+		};
+		7DB0F591302EAE1D005452E3 /* RESOURCE */ = {
+			isa = PBXGroup;
+			children = (
+				7DB0F592302EAE3F005452E3 /* inspection_record_demo.gif */,
+			);
+			path = RESOURCE;
 			sourceTree = "<group>";
 		};
 		7DF77CDC302C143400F953B9 /* Recovered References */ = {
@@ -138,6 +172,8 @@
 				7DF77CD7302BFF1F00F953B9 /* LICENSE */,
 				7DF77CD8302BFF1F00F953B9 /* README.md */,
 				7D19127F302DA6260065A942 /* MD */,
+				7DB0F591302EAE1D005452E3 /* RESOURCE */,
+				7DB0F58D302EA8A2005452E3 /* SUPABASE */,
 				A00000000000000000000063 /* Config */,
 				A0000000000000000000001C /* InspectionRecordDemo */,
 				A00000000000000000000004 /* Products */,
