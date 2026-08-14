@@ -39,6 +39,7 @@ final class InspectionListFeatureTests: XCTestCase {
             $0.hasLoadedPersistence = true
         }
         await store.receive(\.serverTargetsLoaded)
+        await store.receive(\.serverRecordsLoaded)
     }
 
     func testServerTargetDoesNotReplacePendingLocalTarget() async {
@@ -63,6 +64,7 @@ final class InspectionListFeatureTests: XCTestCase {
         }
 
         await store.send(.serverTargetsLoaded([serverTarget.domainValue]))
+        await store.receive(\.serverRecordsLoaded)
     }
 
     func testTaskLoadsServerTargetsIntoList() async {
@@ -74,6 +76,18 @@ final class InspectionListFeatureTests: XCTestCase {
             updatedAt: Date(timeIntervalSince1970: 1_000)
         )
         let expectedTarget = serverTarget.domainValue
+        let serverRecord = InspectionRecord(
+            id: UUID(),
+            targetID: serverTarget.id,
+            targetNameSnapshot: serverTarget.name,
+            equipmentNumberSnapshot: serverTarget.equipmentNumber,
+            createdAt: Date(timeIntervalSince1970: 2_000),
+            updatedAt: Date(timeIntervalSince1970: 2_000),
+            photoData: nil,
+            status: .normal,
+            memo: "서버 이력",
+            syncStatus: .synced
+        )
         let store = TestStore(initialState: InspectionListFeature.State()) {
             InspectionListFeature()
         } withDependencies: {
@@ -81,6 +95,10 @@ final class InspectionListFeatureTests: XCTestCase {
             $0.inspectionTargetsClient = InspectionTargetsClient(
                 fetch: { [serverTarget] },
                 upsert: { $0 }
+            )
+            $0.inspectionRecordsClient = InspectionRecordsClient(
+                fetch: { [serverRecord] },
+                sync: { record, _ in record }
             )
         }
 
@@ -93,6 +111,9 @@ final class InspectionListFeatureTests: XCTestCase {
         }
         await store.receive(\.serverTargetsLoaded) {
             $0.targets = [expectedTarget]
+        }
+        await store.receive(\.serverRecordsLoaded) {
+            $0.records = [serverRecord]
         }
     }
 
@@ -123,6 +144,7 @@ final class InspectionListFeatureTests: XCTestCase {
         await store.send(.serverTargetsLoaded([serverTarget.domainValue])) {
             $0.targets = [expectedTarget]
         }
+        await store.receive(\.serverRecordsLoaded)
     }
 
     func testOlderServerTargetDoesNotReplaceNewerSyncedLocalTarget() async {
@@ -147,6 +169,151 @@ final class InspectionListFeatureTests: XCTestCase {
         }
 
         await store.send(.serverTargetsLoaded([serverTarget.domainValue]))
+        await store.receive(\.serverRecordsLoaded)
+    }
+
+    func testServerRecordIsAddedAndSortedByCreatedAt() async {
+        let target = makeTarget(syncStatus: .synced)
+        let olderRecord = makeRecord(
+            for: target,
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            status: .normal
+        )
+        let serverRecord = InspectionRecord(
+            id: UUID(),
+            targetID: target.id,
+            targetNameSnapshot: target.name,
+            equipmentNumberSnapshot: target.equipmentNumber,
+            createdAt: Date(timeIntervalSince1970: 2_000),
+            updatedAt: Date(timeIntervalSince1970: 2_000),
+            photoData: nil,
+            status: .caution,
+            memo: "서버 이력",
+            syncStatus: .synced
+        )
+        var initialState = InspectionListFeature.State()
+        initialState.targets = [target]
+        initialState.records = [olderRecord]
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        }
+
+        await store.send(.serverRecordsLoaded([serverRecord])) {
+            $0.records = [serverRecord, olderRecord]
+        }
+    }
+
+    func testServerRecordDoesNotReplacePendingLocalRecord() async {
+        let target = makeTarget(syncStatus: .synced)
+        let recordID = UUID()
+        let localRecord = InspectionRecord(
+            id: recordID,
+            targetID: target.id,
+            targetNameSnapshot: "로컬 대상",
+            equipmentNumberSnapshot: target.equipmentNumber,
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            updatedAt: Date(timeIntervalSince1970: 1_000),
+            photoData: Data([1]),
+            status: .normal,
+            memo: "로컬 pending",
+            syncStatus: .pending
+        )
+        let serverRecord = InspectionRecord(
+            id: recordID,
+            targetID: target.id,
+            targetNameSnapshot: "서버 대상",
+            equipmentNumberSnapshot: target.equipmentNumber,
+            createdAt: localRecord.createdAt,
+            updatedAt: Date(timeIntervalSince1970: 2_000),
+            photoData: nil,
+            status: .abnormal,
+            memo: "서버 최신",
+            syncStatus: .synced
+        )
+        var initialState = InspectionListFeature.State()
+        initialState.records = [localRecord]
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        }
+
+        await store.send(.serverRecordsLoaded([serverRecord]))
+    }
+
+    func testNewerServerRecordReplacesSyncedLocalRecordAndPreservesPhotoData() async {
+        let target = makeTarget(syncStatus: .synced)
+        let recordID = UUID()
+        let localPhotoData = Data([1, 2, 3])
+        let localRecord = InspectionRecord(
+            id: recordID,
+            targetID: target.id,
+            targetNameSnapshot: target.name,
+            equipmentNumberSnapshot: target.equipmentNumber,
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            updatedAt: Date(timeIntervalSince1970: 1_000),
+            photoData: localPhotoData,
+            status: .normal,
+            memo: "기존 이력",
+            syncStatus: .synced
+        )
+        let serverRecord = InspectionRecord(
+            id: recordID,
+            targetID: target.id,
+            targetNameSnapshot: target.name,
+            equipmentNumberSnapshot: target.equipmentNumber,
+            createdAt: localRecord.createdAt,
+            updatedAt: Date(timeIntervalSince1970: 2_000),
+            photoData: nil,
+            status: .caution,
+            memo: "최신 서버 이력",
+            syncStatus: .synced
+        )
+        var expectedRecord = serverRecord
+        expectedRecord.photoData = localPhotoData
+        var initialState = InspectionListFeature.State()
+        initialState.records = [localRecord]
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        }
+
+        await store.send(.serverRecordsLoaded([serverRecord])) {
+            $0.records = [expectedRecord]
+        }
+    }
+
+    func testOlderServerRecordDoesNotReplaceNewerSyncedLocalRecord() async {
+        let target = makeTarget(syncStatus: .synced)
+        let recordID = UUID()
+        let localRecord = InspectionRecord(
+            id: recordID,
+            targetID: target.id,
+            targetNameSnapshot: target.name,
+            equipmentNumberSnapshot: target.equipmentNumber,
+            createdAt: Date(timeIntervalSince1970: 2_000),
+            updatedAt: Date(timeIntervalSince1970: 2_000),
+            photoData: Data([1]),
+            status: .abnormal,
+            memo: "최신 로컬 이력",
+            syncStatus: .synced
+        )
+        let serverRecord = InspectionRecord(
+            id: recordID,
+            targetID: target.id,
+            targetNameSnapshot: target.name,
+            equipmentNumberSnapshot: target.equipmentNumber,
+            createdAt: localRecord.createdAt,
+            updatedAt: Date(timeIntervalSince1970: 1_000),
+            photoData: nil,
+            status: .normal,
+            memo: "오래된 서버 이력",
+            syncStatus: .synced
+        )
+        var initialState = InspectionListFeature.State()
+        initialState.records = [localRecord]
+        let store = TestStore(initialState: initialState) {
+            InspectionListFeature()
+        }
+
+        await store.send(.serverRecordsLoaded([serverRecord]))
     }
 
     func testTargetDetailButtonPresentsTargetDetailWithLatestInspectionDate() async {

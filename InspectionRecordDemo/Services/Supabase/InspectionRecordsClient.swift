@@ -26,6 +26,7 @@ private struct InspectionRecordPayload: Codable, Sendable {
     let memo: String
     let latitude: Double?
     let longitude: Double?
+    let photoPath: String?
     let createdAt: Date
     let updatedAt: Date
 
@@ -38,6 +39,7 @@ private struct InspectionRecordPayload: Codable, Sendable {
         self.memo = record.memo
         self.latitude = record.latitude
         self.longitude = record.longitude
+        self.photoPath = nil
         self.createdAt = record.createdAt
         self.updatedAt = record.updatedAt
     }
@@ -79,6 +81,10 @@ private struct InspectionRecordPayload: Codable, Sendable {
         self.longitude = try container.decodeIfPresent(
             Double.self,
             forKey: .longitude
+        )
+        self.photoPath = try (
+            container.decodeIfPresent(String.self, forKey: .photoPath)
+                ?? container.decodeIfPresent(String.self, forKey: .photoPathCamel)
         )
         self.createdAt = try (
             container.decodeIfPresent(Date.self, forKey: .createdAt)
@@ -122,6 +128,8 @@ private struct InspectionRecordPayload: Codable, Sendable {
         case memo
         case latitude
         case longitude
+        case photoPath = "photo_path"
+        case photoPathCamel = "photoPath"
         case createdAt
         case createdAtSnakeCase = "created_at"
         case updatedAt
@@ -151,6 +159,7 @@ private struct SyncInspectionResponse: Decodable, Sendable {
 }
 
 struct InspectionRecordsClient: Sendable {
+    var fetch: @Sendable () async throws -> [InspectionRecord]
     var sync: @Sendable (
         _ record: InspectionRecord,
         _ photoAction: InspectionRecordPhotoAction
@@ -159,6 +168,25 @@ struct InspectionRecordsClient: Sendable {
 
 extension InspectionRecordsClient: DependencyKey {
     static let liveValue = Self(
+        fetch: {
+            let client = try makeSupabaseClient()
+            let payloads: [InspectionRecordPayload] = try await client
+                .from("inspection_records")
+                .select(
+                    "id, target_id, target_name_snapshot, "
+                        + "equipment_number_snapshot, status, memo, latitude, "
+                        + "longitude, photo_path, created_at, updated_at"
+                )
+                .execute()
+                .value
+
+            return payloads.map {
+                $0.inspectionRecord(
+                    preservingPhotoData: nil,
+                    syncStatus: .synced
+                )
+            }
+        },
         sync: { record, photoAction in
             let photoData = try validatePhoto(
                 record.photoData,
@@ -239,6 +267,7 @@ extension InspectionRecordsClient: DependencyKey {
     )
 
     static let testValue = Self(
+        fetch: { [] },
         sync: { record, _ in record }
     )
 }

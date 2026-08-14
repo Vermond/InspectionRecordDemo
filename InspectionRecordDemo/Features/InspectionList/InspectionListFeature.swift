@@ -5,6 +5,7 @@ import Foundation
 struct InspectionListFeature {
     @Dependency(\.inspectionRepository) private var inspectionRepository
     @Dependency(\.inspectionTargetsClient) private var inspectionTargetsClient
+    @Dependency(\.inspectionRecordsClient) private var inspectionRecordsClient
     @Dependency(\.locationPreferences) private var locationPreferences
 
     @ObservableState
@@ -71,6 +72,8 @@ struct InspectionListFeature {
         case persistenceLoaded(Result<InspectionRepository.Snapshot, InspectionPersistenceError>)
         case serverTargetsLoaded([InspectionTarget])
         case serverTargetsLoadFailed
+        case serverRecordsLoaded([InspectionRecord])
+        case serverRecordsLoadFailed
         case targetPersisted(InspectionTarget)
         case targetSynced(InspectionTarget)
         case targetSyncFailed
@@ -159,10 +162,43 @@ struct InspectionListFeature {
                 }
 
                 state.targets = mergedTargets
-                return persistServerTargets(targetsToPersist)
+                return persistServerTargetsThenFetchRecords(targetsToPersist)
+
+            case let .serverRecordsLoaded(serverRecords):
+                let localRecords = state.records
+                let localRecordsByID = Dictionary(
+                    uniqueKeysWithValues: localRecords.map { ($0.id, $0) }
+                )
+                let mergedRecords = Self.mergeRecords(
+                    localRecords: localRecords,
+                    serverRecords: serverRecords
+                )
+                let recordsToPersist = serverRecords.compactMap { serverRecord in
+                    guard let localRecord = localRecordsByID[serverRecord.id] else {
+                        return serverRecord
+                    }
+
+                    guard localRecord.syncStatus == .synced,
+                          serverRecord.updatedAt > localRecord.updatedAt
+                    else {
+                        return nil
+                    }
+
+                    return Self.serverRecord(
+                        preservingPhotoDataFrom: localRecord,
+                        in: serverRecord
+                    )
+                }
+
+                state.records = mergedRecords
+                return persistServerRecords(recordsToPersist)
 
             case .serverTargetsLoadFailed:
                 state.persistenceErrorMessage = "점검 대상 목록을 서버에서 불러오지 못했습니다."
+                return .none
+
+            case .serverRecordsLoadFailed:
+                state.persistenceErrorMessage = "점검 이력 목록을 서버에서 불러오지 못했습니다."
                 return .none
 
             case let .destination(.presented(.targetForm(.delegate(.saved(target))))):
@@ -354,8 +390,37 @@ struct InspectionListFeature {
         }
     }
 
-    private func persistServerTargets(_ targets: [InspectionTarget]) -> EffectOf<Self> {
-        guard !targets.isEmpty else {
+    private func persistServerTargetsThenFetchRecords(
+        _ targets: [InspectionTarget]
+    ) -> EffectOf<Self> {
+        let repository = self.inspectionRepository
+        let client = self.inspectionRecordsClient
+
+        return .run { send in
+            do {
+                for target in targets {
+                    try await repository.saveTarget(target)
+                }
+            } catch let error as InspectionPersistenceError {
+                await send(.persistenceFailed(error))
+                return
+            } catch {
+                await send(.persistenceFailed(.saveFailed))
+                return
+            }
+
+            do {
+                await send(.serverRecordsLoaded(try await client.fetch()))
+            } catch {
+                await send(.serverRecordsLoadFailed)
+            }
+        }
+    }
+
+    private func persistServerRecords(
+        _ records: [InspectionRecord]
+    ) -> EffectOf<Self> {
+        guard !records.isEmpty else {
             return .none
         }
 
@@ -363,8 +428,8 @@ struct InspectionListFeature {
 
         return .run { send in
             do {
-                for target in targets {
-                    try await repository.saveTarget(target)
+                for record in records {
+                    try await repository.saveRecord(record)
                 }
             } catch let error as InspectionPersistenceError {
                 await send(.persistenceFailed(error))
@@ -398,6 +463,44 @@ struct InspectionListFeature {
         }
 
         return mergedTargets.values.sorted { $0.name < $1.name }
+    }
+
+    private static func mergeRecords(
+        localRecords: [InspectionRecord],
+        serverRecords: [InspectionRecord]
+    ) -> [InspectionRecord] {
+        var mergedRecords = Dictionary(
+            uniqueKeysWithValues: localRecords.map { ($0.id, $0) }
+        )
+
+        for serverRecord in serverRecords {
+            guard let localRecord = mergedRecords[serverRecord.id] else {
+                mergedRecords[serverRecord.id] = serverRecord
+                continue
+            }
+
+            guard localRecord.syncStatus == .synced,
+                  serverRecord.updatedAt > localRecord.updatedAt
+            else {
+                continue
+            }
+
+            mergedRecords[serverRecord.id] = Self.serverRecord(
+                preservingPhotoDataFrom: localRecord,
+                in: serverRecord
+            )
+        }
+
+        return mergedRecords.values.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private static func serverRecord(
+        preservingPhotoDataFrom localRecord: InspectionRecord,
+        in serverRecord: InspectionRecord
+    ) -> InspectionRecord {
+        var mergedRecord = serverRecord
+        mergedRecord.photoData = localRecord.photoData
+        return mergedRecord
     }
 }
 
